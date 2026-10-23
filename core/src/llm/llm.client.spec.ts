@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { CoreConfig } from '../config';
 import { LlmClient } from './llm.client';
 import type { ChatMessage } from './llm.client';
@@ -340,6 +341,67 @@ describe('LlmClient', () => {
           { onToken: () => {} },
         ),
       ).rejects.toMatchObject({ name: 'LlmError', httpStatus: 504 });
+    });
+
+    it('surfaces an error envelope sent inside a 200 stream', async () => {
+      global.fetch = () =>
+        Promise.resolve(
+          sseResponse([
+            'data: {"error":{"code":500,"message":"Compute error.","type":"server_error"}}\n\n',
+          ]),
+        );
+
+      const pending = clientWith().chatStream(
+        { messages: [{ role: 'user', content: 'hi' }] },
+        { onToken: () => {} },
+      );
+      await expect(pending).rejects.toMatchObject({
+        name: 'LlmError',
+        httpStatus: 502,
+      });
+      await expect(pending).rejects.toThrow('Compute error.');
+    });
+
+    it('surfaces a string error envelope inside a 200 stream', async () => {
+      global.fetch = () =>
+        Promise.resolve(
+          sseResponse(['data: {"error":"model is warming up"}\n\n']),
+        );
+
+      await expect(
+        clientWith().chatStream(
+          { messages: [{ role: 'user', content: 'hi' }] },
+          { onToken: () => {} },
+        ),
+      ).rejects.toThrow('model is warming up');
+    });
+
+    it('logs a bounded preview when a frame is structurally invalid', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      global.fetch = () =>
+        Promise.resolve(
+          sseResponse(['data: {"model":"test-model","choices":[]}\n\n']),
+        );
+
+      await expect(
+        clientWith().chatStream(
+          { messages: [{ role: 'user', content: 'hi' }] },
+          { onToken: () => {} },
+        ),
+      ).rejects.toMatchObject({
+        name: 'LlmError',
+        httpStatus: 502,
+        message: 'LLM endpoint returned an invalid completion',
+      });
+
+      expect(warn).toHaveBeenCalled();
+      const logged = String(warn.mock.calls[0]?.[0] ?? '');
+      expect(logged).toContain('invalid completion payload');
+      expect(logged).toContain('choices');
+      expect(logged.length).toBeLessThan(400);
+      warn.mockRestore();
     });
   });
 

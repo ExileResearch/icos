@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CORE_CONFIG } from '../config';
 import { buildRequestHeaders } from './llm-provider';
 import type { LlmChatRequest } from './llm-provider';
@@ -107,6 +107,8 @@ export function upstreamMessage(value: unknown): string {
 
 @Injectable()
 export class LlmClient {
+  private readonly logger = new Logger(LlmClient.name);
+
   constructor(
     @Inject(CORE_CONFIG) private readonly config: LlmEndpointConfig,
   ) {}
@@ -244,7 +246,12 @@ export class LlmClient {
       signal.throwIfAborted();
       const parsed = parseJson(text);
       this.throwIfUpstreamError(parsed);
-      return parser.response(parsed);
+      try {
+        return parser.response(parsed);
+      } catch (err) {
+        this.logInvalidPayload(text, err);
+        throw err;
+      }
     } catch (err) {
       if (signal.aborted) {
         throw this.providerError(
@@ -286,6 +293,20 @@ export class LlmClient {
     if (message) {
       throw this.providerError(502, `LLM endpoint error: ${message}`, false);
     }
+  }
+
+  /**
+   * Bounded diagnostic for a structurally invalid completion. "invalid
+   * completion" alone cannot distinguish truncation, an error envelope, or a
+   * provider quirk; log a short whitespace-collapsed preview. Response frames
+   * only — never headers, the request, or credentials.
+   */
+  private logInvalidPayload(raw: string, err: unknown): void {
+    if (!(err instanceof LlmError)) return;
+    const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 300);
+    this.logger.warn(
+      `[${this.endpoint().provider}] invalid completion payload: ${preview || '<empty>'}`,
+    );
   }
 
   /** Tag errors with the provider id. Never include credentials. */
@@ -360,7 +381,19 @@ export class LlmClient {
         if (strict) throw err;
         return false;
       }
-      parser.chunk(value, sink);
+      // Providers can report failure *inside* a 200 stream (DMR sends
+      // `data: {"error":{"code":500,"message":"Compute error."}}`). Surface
+      // the provider's own words instead of an opaque protocol violation.
+      const upstream = upstreamMessage(value);
+      if (upstream) {
+        throw this.providerError(502, `LLM endpoint error: ${upstream}`, false);
+      }
+      try {
+        parser.chunk(value, sink);
+      } catch (err) {
+        this.logInvalidPayload(payload, err);
+        throw err;
+      }
       signal.throwIfAborted();
       return false;
     };
