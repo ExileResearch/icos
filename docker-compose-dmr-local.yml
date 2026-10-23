@@ -35,5 +35,9 @@ models:
     context_size: 8192 # Memory model context window size
 
   chat_llm:
+    # 8K, not 16K: each loaded model is wired (--no-mmap), and a 16 GB host
+    # running chat + memory at 16K exhausts GPU/unified memory — the first
+    # decode then fails with "Compute error" (Metal out of memory) and the
+    # backend stays poisoned until the runner is restarted.
     model: hf.co/unsloth/gemma-4-E4B-it-GGUF:Q4_K_M
-    context_size: 16384 # Chat model context window size
+    context_size: 8192 # Chat model context window size
