@@ -88,14 +88,31 @@ cut off below).
 
 ## Honest remainder
 
-- The live transcript was built with deterministic `/health` turns because the
-  configured provider (`opencode` / `deepseek-v4.1-flash`) answered
-  `LLM endpoint returned an invalid completion`. Token-by-token streaming was
-  therefore **not** exercised live; it is covered by the unit tests, which drive
-  the same signals (`pendingText` appended per token) through real
-  change-detection and the real after-render pass.
-- The live wheel gesture was a synthetic `WheelEvent` plus a real `scrollTop`
-  change (the harness has no trusted trackpad input). The scroll position,
-  clamping, and render timing were the browser's own.
+- **Token-level streaming was not captured by the harness.** It was verified in
+  live use: the reporter scrolled back during a live turn and confirmed the
+  transcript no longer sticks. Scripting the same path was not reproducible
+  because the local DMR backend on this 16 GB host was unstable (Metal
+  out-of-memory compute errors, and stale `llama-server` instances holding
+  memory). What the harness *did* measure live: after each completed turn the
+  view rests at gap **0 px** from the newest message.
+- The streaming interaction itself is pinned mechanically by the unit tests,
+  which drive `pendingText` token-by-token through real change detection and
+  the real after-render pass, and which fail on the old implementation.
+- The live wheel gesture in earlier attempts was a synthetic `WheelEvent` plus
+  a real `scrollTop` change (the harness has no trusted trackpad input); the
+  scroll position, clamping, and render timing were the browser's own.
 - Mobile momentum scrolling was not exercised on a device; the touch path is
   covered by unit tests only.
+
+## What this bug exposed
+
+Chasing it produced two follow-ups, both now fixed:
+
+- `ngAfterViewChecked` never fired for the committed-message render, so the
+  transcript silently stopped following the turn — the "sticky but not quite"
+  part of the complaint. Replaced with `afterRenderEffect`.
+- The provider's own failure was hidden behind "invalid completion". Docker
+  Model Runner returned a Metal **out-of-memory** error *inside* a 200 stream;
+  the LLM client now surfaces the provider's message (`LLM endpoint error:
+  Compute error.`) and logs a bounded frame preview, so the next occurrence is
+  diagnosable instead of mysterious.
