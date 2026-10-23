@@ -1,0 +1,74 @@
+<ul class="attachments" aria-label="Attachments">
+  @for (attachment of attachments(); track attachment.url) {
+    <li>
+      @switch (kindOf(attachment)) {
+        @case ('image') {
+          @if (previewFor(attachment.url); as preview) {
+            <a
+              class="tile preview"
+              [href]="preview"
+              target="_blank"
+              rel="noopener"
+              [attr.title]="label(attachment)"
+              [attr.aria-label]="label(attachment)"
+            >
+              <img [src]="preview" [alt]="attachment.name ?? 'Image attachment'" />
+            </a>
+          } @else {
+            <span class="tile icon" [attr.title]="label(attachment)">
+              <svg lucideFile [size]="18" aria-hidden="true"></svg>
+              <span class="name">{{ attachment.name ?? 'image' }}</span>
+            </span>
+          }
+        }
+        @case ('video') {
+          @if (previewFor(attachment.url); as preview) {
+            <a
+              class="tile preview video"
+              [href]="preview"
+              target="_blank"
+              rel="noopener"
+              [attr.title]="label(attachment)"
+              [attr.aria-label]="label(attachment)"
+            >
+              <video [src]="preview" muted preload="metadata"></video>
+              <svg class="overlay" lucideFilm [size]="14" aria-hidden="true"></svg>
+            </a>
+          } @else {
+            <span class="tile icon" [attr.title]="label(attachment)">
+              <svg lucideFilm [size]="18" aria-hidden="true"></svg>
+              <span class="name">{{ attachment.name ?? 'video' }}</span>
+            </span>
+          }
+        }
+        @case ('audio') {
+          <span class="tile icon" [attr.title]="label(attachment)">
+            <svg lucideMusic [size]="18" aria-hidden="true"></svg>
+            <span class="name">{{ attachment.name ?? 'audio' }}</span>
+          </span>
+        }
+        @case ('archive') {
+          <span class="tile icon" [attr.title]="label(attachment)">
+            <svg lucideArchive [size]="18" aria-hidden="true"></svg>
+            <span class="name">{{ attachment.name ?? 'archive' }}</span>
+          </span>
+        }
+        @case ('document') {
+          <span class="tile icon" [attr.title]="label(attachment)">
+            <svg lucideFileText [size]="18" aria-hidden="true"></svg>
+            <span class="name">{{ attachment.name ?? 'document' }}</span>
+          </span>
+        }
+        @default {
+          <span class="tile icon" [attr.title]="label(attachment)">
+            <svg lucideFileQuestion [size]="18" aria-hidden="true"></svg>
+            <span class="name">{{ attachment.name ?? 'file' }}</span>
+          </span>
+        }
+      }
+      @if (sizeOf(attachment); as size) {
+        <span class="size">{{ size }}</span>
+      }
+    </li>
+  }
+</ul>

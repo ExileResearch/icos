@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { MessageAttachments } from '../message-attachments/message-attachments';
 import type { ChatMessage } from '../../models/message';
 import { renderMarkdown } from '../../util/markdown';
 
@@ -9,7 +10,7 @@ import { renderMarkdown } from '../../util/markdown';
  */
 @Component({
   selector: 'app-message-list',
-  imports: [],
+  imports: [MessageAttachments],
   templateUrl: './message-list.html',
   styleUrl: './message-list.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

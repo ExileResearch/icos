@@ -1693,7 +1693,7 @@ describe('Conversation (e2e)', () => {
       .expect('Content-Type', /image\/png/);
 
     // A turn can carry the reference; the model sees a bounded attachments band.
-    await request(http())
+    const turn = await request(http())
       .post('/core/conversation')
       .send({
         message: 'please review the attached file',
@@ -1711,6 +1711,23 @@ describe('Conversation (e2e)', () => {
     );
     expect(band?.content).toContain(meta.url);
     expect(band?.content).toContain('name: a.png');
+
+    // GH22: the transcript keeps the reference so the chat can redraw the
+    // attachment chip after a reload (display metadata, not a second copy).
+    const history = await request(http())
+      .get(`/core/conversation/${(turn.body as { sessionId: string }).sessionId}`)
+      .expect(200);
+    const userMessage = (
+      history.body as {
+        messages: {
+          role: string;
+          attachments?: { url: string; name?: string }[];
+        }[];
+      }
+    ).messages.find((message) => message.role === 'user');
+    expect(userMessage?.attachments).toEqual([
+      expect.objectContaining({ url: meta.url, name: 'a.png' }),
+    ]);
   });
 
   describe('tool turns', () => {

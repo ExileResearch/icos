@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL,
     excluded_from_context INTEGER NOT NULL DEFAULT 0,
+    -- GH22: uploaded files attached to this message, as a JSON array. Display
+    -- metadata only; never part of the LLM context.
+    attachments TEXT,
 
     FOREIGN KEY (session_id)
         REFERENCES sessions(id)
@@ -931,6 +934,8 @@ function migrateColumns(db: Database.Database, schema: DatabaseSchema): void {
       'excluded_from_context',
       'INTEGER NOT NULL DEFAULT 0',
     );
+    // GH22: transcripts written before attachment metadata was kept.
+    addColumnIfMissing(db, 'messages', 'attachments', 'TEXT');
     migrateToolRequests(db);
     migrateAgentRuns(db);
     addColumnIfMissing(

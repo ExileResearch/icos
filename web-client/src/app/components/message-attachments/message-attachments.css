@@ -1,0 +1,81 @@
+:host {
+  display: block;
+}
+
+.attachments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+}
+
+.tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.5rem;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  overflow: hidden;
+  max-width: 15rem;
+  text-decoration: none;
+}
+
+.tile.icon {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.tile.preview {
+  position: relative;
+  border-color: var(--border-strong);
+}
+
+.tile.preview img,
+.tile.preview video {
+  display: block;
+  width: 88px;
+  height: 66px;
+  object-fit: cover;
+}
+
+.tile.preview .overlay {
+  position: absolute;
+  left: 0.25rem;
+  bottom: 0.25rem;
+  padding: 0.1rem;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.tile:hover {
+  border-color: var(--accent-sage-deep);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--accent-sage-deep);
+  outline-offset: 2px;
+}

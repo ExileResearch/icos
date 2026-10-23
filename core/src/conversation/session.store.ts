@@ -6,6 +6,7 @@ import type { ChatMessage } from '../llm/llm.client';
 import { SessionRepository } from '../session/session.repository';
 import type {
   ContextSummary,
+  MessageAttachment,
   MessageRecord,
   Session,
   SessionSearchResult,
@@ -16,6 +17,8 @@ import type {
 export interface HistoryMessage extends ChatMessage {
   excludedFromContext: boolean;
   createdAt: string;
+  /** Uploaded files shown with the bubble (GH22); display only. */
+  attachments?: readonly MessageAttachment[];
 }
 
 /**
@@ -50,8 +53,9 @@ export class SessionStore {
   async append(
     sessionId: string,
     message: ChatMessage,
+    attachments?: readonly MessageAttachment[],
   ): Promise<MessageRecord> {
-    return this.repository.appendMessage(sessionId, message);
+    return this.repository.appendMessage(sessionId, message, attachments);
   }
 
   /** Recent window for LLM context construction (bounded by maxHistory). */
@@ -76,6 +80,9 @@ export class SessionStore {
           content: record.content,
           excludedFromContext: record.excludedFromContext,
           createdAt: record.createdAt,
+          ...(record.attachments?.length
+            ? { attachments: record.attachments }
+            : {}),
         }) as HistoryMessage,
     );
   }

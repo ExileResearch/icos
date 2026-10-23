@@ -443,6 +443,7 @@ export class ConversationService {
           userText: message,
           history: turn.history,
           record,
+          attachments: options?.attachments,
         });
       } catch (err) {
         this.finishRun(runId, 'failed', { reason: 'turn_error', toolSteps });
@@ -1046,6 +1047,7 @@ export class ConversationService {
               userText: message,
               history: turn.history,
               record,
+              attachments,
             });
           } catch (err) {
             this.finishRun(runId, 'failed', {
@@ -2003,6 +2005,7 @@ export class ConversationService {
     userText: string;
     history: ChatMessage[];
     record: ToolExecutionRecord;
+    attachments?: readonly TurnAttachment[];
   }): Promise<TurnOutcome> {
     const { sessionId, requestId, userText, history, record } = input;
     if (record.state === 'invalid') {
@@ -2023,6 +2026,7 @@ export class ConversationService {
           history,
           content: record.input.proposal.content,
           model: record.input.proposal.model,
+          attachments: input.attachments,
         });
       }
       throw new BadGatewayException(
@@ -2073,6 +2077,7 @@ export class ConversationService {
         assistantText: notice,
         history,
         extract: false,
+        attachments: input.attachments,
       });
       return {
         status: 'ok',
@@ -2111,6 +2116,7 @@ export class ConversationService {
           assistantText: content,
           history,
           extract: true,
+          attachments: input.attachments,
         });
         return {
           status: 'ok',
@@ -2130,6 +2136,7 @@ export class ConversationService {
           assistantText: notice,
           history,
           extract: false,
+          attachments: input.attachments,
         });
         return {
           status: 'ok',
@@ -2165,6 +2172,7 @@ export class ConversationService {
     history: ChatMessage[];
     content: string;
     model: string;
+    attachments?: readonly TurnAttachment[];
   }): Promise<TurnOutcome> {
     await this.persistTurn({
       sessionId: input.sessionId,
@@ -2173,6 +2181,7 @@ export class ConversationService {
       assistantText: input.content,
       history: input.history,
       extract: true,
+      attachments: input.attachments,
     });
     return {
       status: 'ok',
@@ -2194,12 +2203,17 @@ export class ConversationService {
     assistantText: string;
     history: ChatMessage[];
     extract: boolean;
+    attachments?: readonly TurnAttachment[];
   }): Promise<void> {
     if (!this.tools.claimTranscript(input.requestId)) return;
-    const userRecord = await this.sessions.append(input.sessionId, {
-      role: 'user',
-      content: input.userText,
-    });
+    const userRecord = await this.sessions.append(
+      input.sessionId,
+      {
+        role: 'user',
+        content: input.userText,
+      },
+      input.attachments,
+    );
     await this.sessions.append(input.sessionId, {
       role: 'assistant',
       content: input.assistantText,

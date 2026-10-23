@@ -1,3 +1,5 @@
+import type { TurnAttachment } from './attachment';
+
 /** Session row. Mirrors core `SessionSummary` (session.repository.ts). */
 export interface SessionSummary {
   readonly sessionId: string;
@@ -34,5 +36,7 @@ export interface ConversationHistoryResponse {
     readonly content: string;
     readonly excludedFromContext: boolean;
     readonly createdAt: string;
+    /** Files sent with the message (GH22); absent when none. */
+    readonly attachments?: readonly TurnAttachment[];
   }[];
 }

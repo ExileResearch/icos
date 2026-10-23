@@ -105,6 +105,64 @@ describe('SqliteSessionRepository', () => {
     ]);
   });
 
+  it('keeps attachment display metadata on the message (GH22)', async () => {
+    const repository = openRepo();
+    await repository.createSession('s1');
+    await repository.appendMessage(
+      's1',
+      { role: 'user', content: 'see attached' },
+      [
+        {
+          url: '/core/attachments/11111111-1111-1111-1111-111111111111',
+          name: 'cat.png',
+          contentType: 'image/png',
+          sizeBytes: 4096,
+        },
+      ],
+    );
+    await repository.appendMessage('s1', {
+      role: 'assistant',
+      content: 'got it',
+    });
+
+    const records = await repository.getMessageRecords('s1');
+    expect(records[0].attachments).toEqual([
+      {
+        url: '/core/attachments/11111111-1111-1111-1111-111111111111',
+        name: 'cat.png',
+        contentType: 'image/png',
+        sizeBytes: 4096,
+      },
+    ]);
+    // Rows without files carry no field at all.
+    expect(records[1]).not.toHaveProperty('attachments');
+    // Attachments are display metadata: they never enter LLM context.
+    expect(await repository.getMessages('s1')).toEqual([
+      { role: 'user', content: 'see attached' },
+      { role: 'assistant', content: 'got it' },
+    ]);
+  });
+
+  it('bounds and sanitises stored attachment metadata (GH22)', async () => {
+    const repository = openRepo();
+    await repository.createSession('s1');
+    await repository.appendMessage('s1', { role: 'user', content: 'files' }, [
+      ...Array.from({ length: 25 }, (_, i) => ({
+        url: `/core/attachments/${String(i).padStart(8, '0')}-0000-0000-0000-000000000000`,
+        name: `f${i}.txt`,
+      })),
+      { url: '', name: 'dropped-empty-url' },
+      { url: `/core/attachments/${'x'.repeat(3000)}`, name: 'long' },
+    ]);
+
+    const [record] = await repository.getMessageRecords('s1');
+    expect(record.attachments).toHaveLength(20);
+    expect(record.attachments?.[19].url.length).toBeLessThanOrEqual(2048);
+    expect(
+      record.attachments?.some((item) => item.name === 'dropped-empty-url'),
+    ).toBe(false);
+  });
+
   it('deletes a session + transcript but leaves the memory DB untouched (M20i)', async () => {
     const repository = openRepo();
     await repository.createSession('s1');
