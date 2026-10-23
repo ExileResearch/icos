@@ -1,12 +1,5 @@
 /* Tool-specific styles; the shared tab-pane/header/badge classes are global. */
 
-.hint {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-}
-
 .tool-list {
   list-style: none;
   margin: 0;

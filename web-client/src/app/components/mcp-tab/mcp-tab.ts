@@ -1,10 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   OnInit,
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import {
@@ -44,8 +46,14 @@ function formatRefLines(map: Record<string, string> | undefined): string {
   templateUrl: './mcp-tab.html',
   styleUrl: './mcp-tab.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '(keydown.Escape)': 'onEscape()',
+  },
 })
 export class McpTab implements OnInit {
+  private readonly editorDialog = viewChild<ElementRef<HTMLElement>>('editorDialog');
+  /** Element that opened the dialog, so focus can return there. */
+  private editorTrigger: HTMLElement | null = null;
   private readonly api = inject(McpAdminService);
 
   readonly servers = signal<readonly McpServerStatus[]>([]);
@@ -122,7 +130,7 @@ export class McpTab implements OnInit {
       enabled: true,
     });
     this.form.controls.name.enable();
-    this.formOpen.set(true);
+    this.openEditor();
   }
 
   startEdit(entry: McpServerEntry): void {
@@ -139,12 +147,33 @@ export class McpTab implements OnInit {
       enabled: entry.enabled !== false,
     });
     this.form.controls.name.disable();
-    this.formOpen.set(true);
+    this.openEditor();
   }
 
   cancel(): void {
-    this.formOpen.set(false);
+    this.closeEditor();
     this.editingName.set(null);
+  }
+
+  onEscape(): void {
+    if (this.formOpen()) {
+      this.cancel();
+    }
+  }
+
+  /** Remember the trigger, open the dialog, and focus it once it renders. */
+  private openEditor(): void {
+    this.editorTrigger =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    this.formOpen.set(true);
+    setTimeout(() => this.editorDialog()?.nativeElement.focus({ preventScroll: true }), 0);
+  }
+
+  /** Close and hand focus back to whatever opened the dialog. */
+  private closeEditor(): void {
+    this.formOpen.set(false);
+    this.editorTrigger?.focus({ preventScroll: true });
+    this.editorTrigger = null;
   }
 
   async submit(): Promise<void> {
@@ -178,7 +207,7 @@ export class McpTab implements OnInit {
     try {
       await this.api.upsert(name, input);
       this.notice.set(`Saved "${name}".`);
-      this.formOpen.set(false);
+      this.closeEditor();
       await this.refresh();
     } catch (err) {
       this.error.set(this.message(err));

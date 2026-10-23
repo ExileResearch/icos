@@ -53,47 +53,63 @@
   </table>
 
   @if (formOpen()) {
-    <form class="editor" [formGroup]="form" (ngSubmit)="submit()" aria-label="MCP server editor">
-      <h2>{{ editingName() ? 'Edit server' : 'Add server' }}</h2>
+    <div class="modal-backdrop" (click)="cancel()">
+      <div
+        #editorDialog
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        aria-labelledby="mcp-editor-title"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="modal-head">
+          <h2 id="mcp-editor-title">{{ editingName() ? 'Edit server' : 'Add server' }}</h2>
+          <span class="grow"></span>
+          <button type="button" class="modal-close" (click)="cancel()">Close</button>
+        </div>
 
-      <label for="mcp-name">Name</label>
-      <input id="mcp-name" formControlName="name" autocomplete="off" />
+        <form class="editor" [formGroup]="form" (ngSubmit)="submit()" aria-label="MCP server editor">
+          <label for="mcp-name">Name</label>
+          <input id="mcp-name" formControlName="name" autocomplete="off" />
 
-      <label for="mcp-transport">Transport</label>
-      <select id="mcp-transport" formControlName="transport">
-        <option value="stdio">stdio</option>
-        <option value="http">http</option>
-      </select>
+          <label for="mcp-transport">Transport</label>
+          <select id="mcp-transport" formControlName="transport">
+            <option value="stdio">stdio</option>
+            <option value="http">http</option>
+          </select>
 
-      @if (isStdio()) {
-        <label for="mcp-command">Command</label>
-        <input id="mcp-command" formControlName="command" autocomplete="off" />
-        <label for="mcp-args">Args (space-separated)</label>
-        <input id="mcp-args" formControlName="args" autocomplete="off" />
-        <label for="mcp-env">Environment references (KEY=$VAR or KEY=secret:NAME)</label>
-        <textarea id="mcp-env" formControlName="env" rows="3" spellcheck="false"></textarea>
-      } @else {
-        <label for="mcp-url">URL</label>
-        <input id="mcp-url" formControlName="url" autocomplete="off" />
-        <label for="mcp-headers">Header references (NAME=$VAR or NAME=secret:NAME)</label>
-        <textarea id="mcp-headers" formControlName="headers" rows="3" spellcheck="false"></textarea>
-      }
+          @if (isStdio()) {
+            <label for="mcp-command">Command</label>
+            <input id="mcp-command" formControlName="command" autocomplete="off" />
+            <label for="mcp-args">Args (space-separated)</label>
+            <input id="mcp-args" formControlName="args" autocomplete="off" />
+            <label for="mcp-env">Environment references (KEY=$VAR or KEY=secret:NAME)</label>
+            <textarea id="mcp-env" formControlName="env" rows="3" spellcheck="false"></textarea>
+          } @else {
+            <label for="mcp-url">URL</label>
+            <input id="mcp-url" formControlName="url" autocomplete="off" />
+            <label for="mcp-headers">Header references (NAME=$VAR or NAME=secret:NAME)</label>
+            <textarea id="mcp-headers" formControlName="headers" rows="3" spellcheck="false"></textarea>
+          }
 
-      <label for="mcp-approval">Approval</label>
-      <select id="mcp-approval" formControlName="approval">
-        <option value="required">required</option>
-        <option value="none">none</option>
-      </select>
+          <label for="mcp-approval">Approval</label>
+          <select id="mcp-approval" formControlName="approval">
+            <option value="required">required</option>
+            <option value="none">none</option>
+          </select>
 
-      <label class="inline">
-        <input type="checkbox" formControlName="enabled" />
-        Enabled
-      </label>
+          <label class="inline">
+            <input type="checkbox" formControlName="enabled" />
+            Enabled
+          </label>
 
-      <div class="actions">
-        <button type="submit" [disabled]="busy()">Save</button>
-        <button type="button" (click)="cancel()" [disabled]="busy()">Cancel</button>
+          <div class="actions">
+            <button type="submit" [disabled]="busy()">Save</button>
+            <button type="button" (click)="cancel()" [disabled]="busy()">Cancel</button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   }
 </section>

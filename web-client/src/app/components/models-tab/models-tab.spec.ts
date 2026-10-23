@@ -83,6 +83,50 @@ describe('ModelsTab', () => {
     ).not.toBeNull();
   });
 
+  describe('editor dialog (GH21)', () => {
+    function host(): HTMLElement {
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    function buttonByText(text: string): HTMLButtonElement {
+      const match = [...host().querySelectorAll('button')].find((b) =>
+        (b.textContent ?? '').trim().includes(text),
+      );
+      if (!match) throw new Error(`button "${text}" not found`);
+      return match;
+    }
+
+    it('opens as a labelled modal dialog, not an inline form', () => {
+      buttonByText('Add provider').click();
+      fixture.detectChanges();
+
+      const dialog = host().querySelector('[role="dialog"]') as HTMLElement;
+      expect(dialog).not.toBeNull();
+      expect(dialog.getAttribute('aria-modal')).toBe('true');
+      expect(host().querySelector('.modal-backdrop')).not.toBeNull();
+
+      const titleId = dialog.getAttribute('aria-labelledby');
+      expect(titleId).toBeTruthy();
+      expect(host().querySelector(`#${titleId}`)?.textContent).toContain('Add provider');
+    });
+
+    it('closes on Escape and hands focus back to the trigger', async () => {
+      const add = buttonByText('Add provider');
+      add.focus();
+      add.click();
+      fixture.detectChanges();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(document.activeElement?.getAttribute('role')).toBe('dialog');
+
+      host().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(host().querySelector('[role="dialog"]')).toBeNull();
+      expect(document.activeElement).toBe(add);
+    });
+  });
+
   it('applies a provider + model selection (FG9c)', async () => {
     const component = fixture.componentInstance;
     component.activeDraft.set({

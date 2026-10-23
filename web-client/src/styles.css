@@ -175,6 +175,83 @@ router-outlet {
   font-size: 0.8125rem;
 }
 
+/* ---------------------------------------------------------------------------
+   Shared tab typography (GH21). Every pane reads at one scale: 13px body
+   copy, 11px uppercase labels, the same table rules and form controls. These
+   live globally because component styles are encapsulated — a `.hint` or
+   `.grid` defined in one tab never reached another.
+   --------------------------------------------------------------------------- */
+
+.hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* Visually hidden, still announced (table action columns, labels). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Shared data table (MCP, Models, Server). */
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.grid th {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.grid td {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* Shared editor form (MCP, Models, Server). Layout stays per component. */
+.editor label {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.editor h2 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.editor input:not([type='checkbox']),
+.editor select,
+.editor textarea {
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+}
+
 /* Shared modal (M20e): backdrop + dialog, reused by any tab. */
 .modal-backdrop {
   position: fixed;
@@ -211,4 +288,22 @@ router-outlet {
 
 .modal-close:hover {
   color: var(--text-primary);
+}
+
+/* Dialog title row (shared by edit dialogs). */
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Editor hints span both grid columns. */
+.editor .hint {
+  grid-column: 1 / -1;
 }
