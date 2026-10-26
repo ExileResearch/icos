@@ -242,6 +242,7 @@ describe('Conversation (e2e)', () => {
           'text/plain',
         ],
         skillsDirPath: join(dir, 'skills'),
+        toolPrefsPath: join(dir, 'tool-prefs.json'),
         skillsEnabled: true,
         skillsSeedEnabled: false,
         skillsMaxBodyChars: 12000,
@@ -3423,5 +3424,134 @@ describe('Conversation (e2e)', () => {
       }
       expect(summary).toContain('child done after approval');
     }, 60000);
+  });
+
+  describe('User stories (FG5)', () => {
+    it('CRON-001: creates, pauses, resumes, runs, and deletes a cron job', async () => {
+      const empty = await request(http()).get('/core/cron').expect(200);
+      expect((empty.body as { jobs: unknown[] }).jobs).toEqual([]);
+
+      const created = await request(http())
+        .post('/core/cron')
+        .send({ name: 'nightly', schedule: '*/5 * * * *', prompt: 'say hi' })
+        .expect(201);
+      const job = (created.body as { job: { id: string; enabled: boolean } }).job;
+      expect(job.enabled).toBe(true);
+
+      const paused = await request(http())
+        .post(`/core/cron/${job.id}/pause`)
+        .expect(200);
+      expect((paused.body as { job: { enabled: boolean } }).job.enabled).toBe(false);
+
+      const resumed = await request(http())
+        .post(`/core/cron/${job.id}/resume`)
+        .expect(200);
+      expect((resumed.body as { job: { enabled: boolean } }).job.enabled).toBe(true);
+
+      const run = await request(http())
+        .post(`/core/cron/${job.id}/run`)
+        .expect(200);
+      expect((run.body as { reply: string | null }).reply).toContain('mock reply');
+
+      const listed = await request(http()).get('/core/cron').expect(200);
+      expect(
+        (listed.body as { jobs: { id: string }[] }).jobs.map((entry) => entry.id),
+      ).toContain(job.id);
+
+      await request(http()).delete(`/core/cron/${job.id}`).expect(200);
+      const after = await request(http()).get('/core/cron').expect(200);
+      expect((after.body as { jobs: unknown[] }).jobs).toEqual([]);
+    });
+
+    it('CRON-002: rejects a malformed job and unknown ids', async () => {
+      await request(http()).post('/core/cron').send({ name: 'x' }).expect(400);
+      await request(http())
+        .post('/core/cron')
+        .send({ name: 'x', schedule: 'not a cron', prompt: 'p' })
+        .expect(400);
+      await request(http())
+        .post('/core/cron/00000000-0000-0000-0000-000000000000/pause')
+        .expect(404);
+    });
+
+    it('TOOL-001: lists the tool inventory and discovery bounds', async () => {
+      const inventory = await request(http())
+        .get('/core/tools/inventory')
+        .expect(200);
+      const tools = (
+        inventory.body as {
+          tools: { name: string; toolset: string; approval: string; autoApprove: boolean }[];
+        }
+      ).tools;
+      expect(tools.length).toBeGreaterThan(10);
+      expect(tools.find((tool) => tool.name === 'read_file')).toMatchObject({
+        autoApprove: false,
+      });
+
+      const discovery = await request(http())
+        .get('/core/tools/discovery')
+        .expect(200);
+      // Discovery is a configuration choice (off in this harness so every
+      // tool is offered); the story is that the state and bounds are visible.
+      const state = discovery.body as {
+        enabled: boolean;
+        universe: number;
+        bounds: { maxPerTurn: number; discoveryLimit: number };
+      };
+      expect(typeof state.enabled).toBe('boolean');
+      expect(state.universe).toBeGreaterThan(10);
+      expect(state.bounds.maxPerTurn).toBeGreaterThan(0);
+    });
+
+    it('TOOL-002: toggles auto-approve and refuses unknown tools', async () => {
+      const enabled = await request(http())
+        .put('/core/tools/auto-approve/read_file')
+        .send({ autoApprove: true })
+        .expect(200);
+      const entry = (
+        enabled.body as { tools: { name: string; autoApprove: boolean }[] }
+      ).tools.find((tool) => tool.name === 'read_file');
+      expect(entry?.autoApprove).toBe(true);
+
+      await request(http())
+        .put('/core/tools/auto-approve/not_a_real_tool')
+        .send({ autoApprove: true })
+        .expect(404);
+    });
+
+    it('SKILL-001: creates, edits, reads back, and deletes a skill', async () => {
+      await request(http())
+        .post('/core/skills')
+        .send({ name: 'e2e-story', description: 'story skill' })
+        .expect(201);
+
+      const updated = await request(http())
+        .put('/core/skills/e2e-story')
+        .send({ description: 'updated description', body: 'Do the thing.' })
+        .expect(200);
+      expect((updated.body as { description: string }).description).toBe(
+        'updated description',
+      );
+
+      const read = await request(http())
+        .get('/core/skills/e2e-story')
+        .expect(200);
+      expect((read.body as { body: string }).body).toContain('Do the thing.');
+
+      await request(http()).delete('/core/skills/e2e-story').expect(200);
+      await request(http()).get('/core/skills/e2e-story').expect(404);
+    });
+
+    it('SESS-001: deletes a session and its transcript', async () => {
+      const turn = await request(http())
+        .post('/core/conversation')
+        .send({ message: 'hello' })
+        .expect(200);
+      const sessionId = (turn.body as { sessionId: string }).sessionId;
+      await request(http()).get(`/core/conversation/${sessionId}`).expect(200);
+
+      await request(http()).delete(`/core/sessions/${sessionId}`).expect(200);
+      await request(http()).get(`/core/conversation/${sessionId}`).expect(404);
+    });
   });
 });
