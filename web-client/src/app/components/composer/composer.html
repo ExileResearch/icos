@@ -1,4 +1,22 @@
 <form class="composer" [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Message composer">
+  @if (suggestionsOpen()) {
+    <ul id="composer-commands" class="command-menu" role="listbox" aria-label="Slash commands">
+      @for (command of suggestions(); track command.name; let i = $index) {
+        <li
+          [id]="optionId(command)"
+          role="option"
+          [attr.aria-selected]="i === active()"
+          [class.active]="i === active()"
+          (mousedown)="$event.preventDefault()"
+          (click)="accept(command)"
+        >
+          <span class="command mono">/{{ command.name }}</span>
+          <span class="command-description">{{ command.description }}</span>
+        </li>
+      }
+    </ul>
+  }
+
   <div class="composer-row">
     <button
       id="composer-attach"
@@ -21,7 +39,14 @@
       rows="2"
       [disabled]="busy()"
       (keydown)="onKeydown($event)"
+      (blur)="dismissSuggestions()"
       aria-label="Message"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-haspopup="listbox"
+      [attr.aria-expanded]="suggestionsOpen()"
+      [attr.aria-controls]="suggestionsOpen() ? 'composer-commands' : null"
+      [attr.aria-activedescendant]="activeId()"
     ></textarea>
     <button id="composer-send" type="submit" [disabled]="sendDisabled()">
       <svg lucideSend [size]="16" aria-hidden="true"></svg>

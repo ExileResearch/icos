@@ -1674,6 +1674,25 @@ describe('Conversation (e2e)', () => {
       .expect(400);
   });
 
+  it('lists the slash-command catalog for the composer (GH20)', async () => {
+    const res = await request(http()).get('/core/commands').expect(200);
+    const { commands } = res.body as {
+      commands: { name: string; description: string }[];
+    };
+
+    expect(commands.length).toBeGreaterThan(5);
+    expect(commands).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'health' }),
+        expect.objectContaining({ name: 'model' }),
+      ]),
+    );
+    // Sorted, canonical names only (no aliases), each with a description.
+    const names = commands.map((command) => command.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(commands.every((command) => command.description.length > 0)).toBe(true);
+  });
+
   it('uploads an attachment, serves it back, and carries it into a turn', async () => {
     const upload = await request(http())
       .post('/core/attachments')

@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 
 import { Composer } from './composer';
 import { AttachmentService } from '../../services/attachment.service';
+import { CommandCatalogService } from '../../services/command-catalog.service';
 import type { ComposerSubmission, StoredAttachment } from '../../models/attachment';
 
 const STORED: StoredAttachment = {
@@ -23,7 +24,21 @@ describe('Composer', () => {
     upload = vi.fn().mockResolvedValue(STORED);
     await TestBed.configureTestingModule({
       imports: [Composer],
-      providers: [{ provide: AttachmentService, useValue: { upload } }],
+      providers: [
+        { provide: AttachmentService, useValue: { upload } },
+        {
+          provide: CommandCatalogService,
+          useValue: {
+            list: vi.fn(() =>
+              Promise.resolve([
+                { name: 'compact', description: 'Summarize the session' },
+                { name: 'model', description: 'Select a different model' },
+                { name: 'new', description: 'Start a new session' },
+              ]),
+            ),
+          },
+        },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Composer);
@@ -108,5 +123,84 @@ describe('Composer', () => {
     component.focusInput();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.ownerDocument.activeElement?.id).toBe('composer-input');
+  });
+
+  describe('slash-command suggestions (GH20)', () => {
+    function menu(): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector('[role="listbox"]');
+    }
+
+    it('offers the catalog while the message is just a command token', async () => {
+      component.form.controls.message.setValue('/');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.suggestions().map((command) => command.name)).toEqual([
+        'compact',
+        'model',
+        'new',
+      ]);
+      expect(menu()).not.toBeNull();
+      expect(menu()?.querySelectorAll('[role="option"]').length).toBe(3);
+    });
+
+    it('filters by prefix and closes once an argument follows', () => {
+      component.form.controls.message.setValue('/mo');
+      expect(component.suggestions().map((command) => command.name)).toEqual(['model']);
+
+      component.form.controls.message.setValue('/model deepseek');
+      expect(component.suggestionsOpen()).toBe(false);
+    });
+
+    it('accepts the highlighted command on Enter without sending', () => {
+      const emitted: ComposerSubmission[] = [];
+      component.submitted.subscribe((submission) => emitted.push(submission));
+      component.form.controls.message.setValue('/');
+      component.moveActive(1);
+
+      component.onKeydown(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+      expect(component.form.controls.message.value).toBe('/model ');
+      expect(emitted).toEqual([]);
+      expect(component.suggestionsOpen()).toBe(false);
+    });
+
+    it('wraps the highlight with the arrow keys', () => {
+      component.form.controls.message.setValue('/');
+      component.moveActive(-1);
+      expect(component.suggestions()[component.active()].name).toBe('new');
+      component.moveActive(1);
+      expect(component.suggestions()[component.active()].name).toBe('compact');
+    });
+
+    it('closes on Escape and leaves what was typed', () => {
+      component.form.controls.message.setValue('/ne');
+      component.onKeydown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(component.suggestionsOpen()).toBe(false);
+      expect(component.form.controls.message.value).toBe('/ne');
+    });
+
+    it('closes when the message box loses focus', () => {
+      component.form.controls.message.setValue('/');
+      expect(component.suggestionsOpen()).toBe(true);
+
+      component.dismissSuggestions();
+
+      expect(component.suggestionsOpen()).toBe(false);
+    });
+
+    it('accepts a clicked suggestion', async () => {
+      component.form.controls.message.setValue('/');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const options = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="option"]');
+      (options[2] as HTMLElement).click();
+
+      expect(component.form.controls.message.value).toBe('/new ');
+    });
   });
 });

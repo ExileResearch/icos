@@ -15,6 +15,7 @@ import { ClarificationsController } from '../clarifications/clarifications.contr
 import { SqliteClarificationRepository } from '../clarifications/sqlite-clarification.repository';
 import { SqliteApprovalRepository } from '../approvals/sqlite-approval.repository';
 import { CommandDispatcher } from '../commands/command-dispatcher';
+import { CommandsController } from '../commands/commands.controller';
 import { DisplayPreferenceStore } from '../commands/display-preferences';
 import { HostHealthProvider } from '../commands/host-health';
 import {
@@ -226,6 +227,7 @@ const toolExecutionServiceProvider = {
     AttachmentsModule,
   ],
   controllers: [
+    CommandsController,
     ConversationController,
     SessionsController,
     CandidatesController,
