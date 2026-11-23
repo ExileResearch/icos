@@ -1,0 +1,36 @@
+# Keep the Docker build context small and secret-free.
+
+**/node_modules
+**/dist
+**/build
+**/.angular
+**/.git
+**/.DS_Store
+**/.env
+**/.env._
+!**/.env.sample
+**/coverage
+**/.nyc_output
+**/.vscode
+**/*.log
+**/*.tsbuildinfo
+**/.DS_Store
+
+# Not needed to build the server or web client.
+
+.reference
+.slim
+.VSCodeCounter
+bin
+docs
+AGENTS.md
+ARCHITECTURE.md
+COMMERCIAL-LICENSE.md
+docker-compose.yml
+docker-compose-dmr.yml
+docker-compose-dmr-local.yml
+INDEX.md
+LICENSE.md
+lines.md
+README.md
+session-*.md
