@@ -24,7 +24,8 @@ import {
 import { buildPlanningBlock } from '../src/agent/planning-context';
 import { DelegationRepository } from '../src/subagents/delegation.repository';
 import { ToolRegistry } from '../src/tools/tool-registry';
-import { LlmClient } from '../src/llm/llm.client';
+import { LlmClient, LlmError } from '../src/llm/llm.client';
+import { ConversationService } from '../src/conversation/conversation.service';
 import { MEMORY_LLM_CLIENT } from '../src/memory/llm-memory-candidate-extractor';
 import { MemoryCandidateExtractor } from '../src/memory/memory-candidate-extractor';
 import { ClaimIndex } from '../src/memory/claim-index';
@@ -3552,6 +3553,75 @@ describe('Conversation (e2e)', () => {
 
       await request(http()).delete(`/core/sessions/${sessionId}`).expect(200);
       await request(http()).get(`/core/conversation/${sessionId}`).expect(404);
+    });
+  });
+
+  describe('Observability (R1/B2)', () => {
+    it('records a provider failure once and exposes it in /core/health', async () => {
+      chatStreamWithTools.mockImplementation(() =>
+        Promise.reject(
+          new LlmError(502, '[test] provider down', true, undefined, 'http'),
+        ),
+      );
+
+      const res = await request(http())
+        .post('/core/conversation/stream')
+        .send({ message: 'hello' })
+        .expect(200)
+        .expect('Content-Type', /event-stream/);
+      expect(res.text).toContain('event: error');
+
+      const health = await request(http()).get('/core/health').expect(200);
+      const errors = (
+        health.body as {
+          errors: { total: number; byBucket: Record<string, number> };
+        }
+      ).errors;
+      // B1 retried the 502 once; the taxonomy still counts the turn once.
+      expect(errors.total).toBe(1);
+      expect(errors.byBucket.provider_http).toBe(1);
+    });
+
+    it('counts raw tool-call markup in a reply without failing the turn (B2)', async () => {
+      chatWithTools.mockResolvedValueOnce({
+        kind: 'text',
+        content: 'here you go <|dsml|>tool_calls',
+        model: 'test-model',
+      });
+
+      await request(http())
+        .post('/core/conversation')
+        .send({ message: 'hello' })
+        .expect(200);
+
+      const health = await request(http()).get('/core/health').expect(200);
+      const errors = (
+        health.body as {
+          errors: { toolSyntaxLeaks: number; byBucket: Record<string, number> };
+        }
+      ).errors;
+      expect(errors.toolSyntaxLeaks).toBe(1);
+      expect(errors.byBucket.tool_syntax_leak).toBe(1);
+    });
+
+    it('does not count a client cancellation as a failure', async () => {
+      chatStreamWithTools.mockImplementation(() =>
+        Promise.reject(new Error('client went away')),
+      );
+
+      // A disconnected client aborts its signal; the turn is cancelled, not
+      // failed, and must not enter the error ledger.
+      const controller = new AbortController();
+      controller.abort();
+      const service = app!.get(ConversationService);
+      await service
+        .converseStream('hello', undefined, () => undefined, controller.signal)
+        .catch(() => undefined);
+
+      const health = await request(http()).get('/core/health').expect(200);
+      expect(
+        (health.body as { errors: { total: number } }).errors.total,
+      ).toBe(0);
     });
   });
 });

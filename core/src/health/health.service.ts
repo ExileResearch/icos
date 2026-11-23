@@ -9,6 +9,7 @@ import { McpConnectionService } from '../mcp/mcp-connection.service';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { realtimeEvent } from '../realtime/realtime-event';
+import { TurnErrorsService } from '../observability/turn-errors.service';
 import { buildHealthReport } from './health-report';
 import type { HealthReport } from './health-report';
 
@@ -39,6 +40,7 @@ export class HealthService implements OnModuleDestroy {
     private readonly host: HostHealthProvider,
     private readonly mcp: McpConnectionService,
     private readonly providers: ProviderRegistryService,
+    private readonly errors: TurnErrorsService,
     @Inject(CORE_CONFIG) private readonly config: CoreConfig,
     private readonly modules: ModuleRef,
   ) {
@@ -63,6 +65,7 @@ export class HealthService implements OnModuleDestroy {
       host: this.host,
       mcp: this.mcp,
       providers: this.providers,
+      errors: this.errors,
     });
   }
 

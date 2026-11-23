@@ -376,6 +376,64 @@ describe('LlmClient', () => {
       ).rejects.toThrow('model is warming up');
     });
 
+    it('retries a 502 once when no token was emitted (B1)', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(new Response('boom', { status: 500 }))
+        .mockResolvedValueOnce(
+          sseResponse([tokenChunk('ok'), 'data: [DONE]\n\n']),
+        );
+      global.fetch = fetchMock;
+
+      const tokens: string[] = [];
+      const result = await clientWith().chatStream(
+        { messages: [{ role: 'user', content: 'hi' }] },
+        { onToken: (token) => tokens.push(token) },
+      );
+
+      expect(result.content).toBe('ok');
+      expect(tokens).toEqual(['ok']);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries a malformed completion once when no token was emitted (B1)', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(sseResponse(['data: {"choices":[]}\n\n']))
+        .mockResolvedValueOnce(
+          sseResponse([tokenChunk('ok'), 'data: [DONE]\n\n']),
+        );
+      global.fetch = fetchMock;
+
+      const result = await clientWith().chatStream(
+        { messages: [{ role: 'user', content: 'hi' }] },
+        { onToken: () => {} },
+      );
+
+      expect(result.content).toBe('ok');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('never replays a stream that already emitted a token (B1)', async () => {
+      const fetchMock = jest.fn(() =>
+        Promise.resolve(
+          sseResponse([tokenChunk('partial'), 'data: {"choices":[]}\n\n']),
+        ),
+      );
+      global.fetch = fetchMock;
+
+      const tokens: string[] = [];
+      await expect(
+        clientWith().chatStream(
+          { messages: [{ role: 'user', content: 'hi' }] },
+          { onToken: (token) => tokens.push(token) },
+        ),
+      ).rejects.toMatchObject({ httpStatus: 502 });
+
+      expect(tokens).toEqual(['partial']);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it('logs a bounded preview when a frame is structurally invalid', async () => {
       const warn = jest
         .spyOn(Logger.prototype, 'warn')

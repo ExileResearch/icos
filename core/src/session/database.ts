@@ -17,6 +17,20 @@ CREATE TABLE IF NOT EXISTS sessions (
     title TEXT
 );
 
+CREATE TABLE IF NOT EXISTS turn_errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    bucket TEXT NOT NULL,
+    code TEXT NOT NULL,
+    http_status INTEGER,
+    request_id TEXT,
+    session_id TEXT,
+    detail TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_turn_errors_at
+ON turn_errors(at);
+
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,

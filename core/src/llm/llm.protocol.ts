@@ -95,6 +95,8 @@ export function protocolError(): LlmError {
     502,
     'LLM endpoint returned an invalid completion',
     false,
+    undefined,
+    'malformed',
   );
 }
 
