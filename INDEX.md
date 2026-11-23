@@ -10,10 +10,11 @@ icos/   # Root of project.
 │     │
 │     └── status.md         # Live project status tracking.
 │
-├── bin/            # Launch script helper files.
-│     ├── dmr       # Compose override shorthand for the DMR variant.
-│     ├── stack     # One command: the claims verifier + the stack.
-│     └── verifier  # Starts the local Jev-style claims verifier (macOS/MLX).
+├── bin/                # Launch script helper files.
+│     ├── dmr           # Compose override shorthand for the DMR variant.
+│     ├── stack         # One command: the claims verifier + the stack.
+│     ├── stack-local   # One command: the claims verifier + stack + local DMR models.
+│     └── verifier      # Starts the local Jev-style claims verifier (macOS/MLX).
 │
 ├── core/                   # Core subsystem.
 │     ├── ...               # Other miscellaneous project files.
