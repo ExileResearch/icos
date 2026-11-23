@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { CoreConfig } from '../config';
 import { LlmClient } from './llm.client';
 import type { ChatMessage } from './llm.client';
@@ -340,6 +341,125 @@ describe('LlmClient', () => {
           { onToken: () => {} },
         ),
       ).rejects.toMatchObject({ name: 'LlmError', httpStatus: 504 });
+    });
+
+    it('surfaces an error envelope sent inside a 200 stream', async () => {
+      global.fetch = () =>
+        Promise.resolve(
+          sseResponse([
+            'data: {"error":{"code":500,"message":"Compute error.","type":"server_error"}}\n\n',
+          ]),
+        );
+
+      const pending = clientWith().chatStream(
+        { messages: [{ role: 'user', content: 'hi' }] },
+        { onToken: () => {} },
+      );
+      await expect(pending).rejects.toMatchObject({
+        name: 'LlmError',
+        httpStatus: 502,
+      });
+      await expect(pending).rejects.toThrow('Compute error.');
+    });
+
+    it('surfaces a string error envelope inside a 200 stream', async () => {
+      global.fetch = () =>
+        Promise.resolve(
+          sseResponse(['data: {"error":"model is warming up"}\n\n']),
+        );
+
+      await expect(
+        clientWith().chatStream(
+          { messages: [{ role: 'user', content: 'hi' }] },
+          { onToken: () => {} },
+        ),
+      ).rejects.toThrow('model is warming up');
+    });
+
+    it('retries a 502 once when no token was emitted (B1)', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(new Response('boom', { status: 500 }))
+        .mockResolvedValueOnce(
+          sseResponse([tokenChunk('ok'), 'data: [DONE]\n\n']),
+        );
+      global.fetch = fetchMock;
+
+      const tokens: string[] = [];
+      const result = await clientWith().chatStream(
+        { messages: [{ role: 'user', content: 'hi' }] },
+        { onToken: (token) => tokens.push(token) },
+      );
+
+      expect(result.content).toBe('ok');
+      expect(tokens).toEqual(['ok']);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries a malformed completion once when no token was emitted (B1)', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(sseResponse(['data: {"choices":[]}\n\n']))
+        .mockResolvedValueOnce(
+          sseResponse([tokenChunk('ok'), 'data: [DONE]\n\n']),
+        );
+      global.fetch = fetchMock;
+
+      const result = await clientWith().chatStream(
+        { messages: [{ role: 'user', content: 'hi' }] },
+        { onToken: () => {} },
+      );
+
+      expect(result.content).toBe('ok');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('never replays a stream that already emitted a token (B1)', async () => {
+      const fetchMock = jest.fn(() =>
+        Promise.resolve(
+          sseResponse([tokenChunk('partial'), 'data: {"choices":[]}\n\n']),
+        ),
+      );
+      global.fetch = fetchMock;
+
+      const tokens: string[] = [];
+      await expect(
+        clientWith().chatStream(
+          { messages: [{ role: 'user', content: 'hi' }] },
+          { onToken: (token) => tokens.push(token) },
+        ),
+      ).rejects.toMatchObject({ httpStatus: 502 });
+
+      expect(tokens).toEqual(['partial']);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs a bounded preview when a frame is structurally invalid', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      global.fetch = () =>
+        Promise.resolve(
+          sseResponse(['data: {"model":"test-model","choices":[]}\n\n']),
+        );
+
+      await expect(
+        clientWith().chatStream(
+          { messages: [{ role: 'user', content: 'hi' }] },
+          { onToken: () => {} },
+        ),
+      ).rejects.toMatchObject({
+        name: 'LlmError',
+        httpStatus: 502,
+        message: 'LLM endpoint returned an invalid completion',
+      });
+
+      expect(warn).toHaveBeenCalled();
+      const logged = String(warn.mock.calls[0]?.[0] ?? '');
+      expect(logged).toContain('invalid completion payload');
+      expect(logged).toContain('choices');
+      expect(logged.length).toBeLessThan(400);
+      warn.mockRestore();
     });
   });
 

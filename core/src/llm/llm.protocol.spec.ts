@@ -74,19 +74,31 @@ function respond(value: unknown) {
 function stream(text: string, bytewise = false, close = true) {
   const cancel = jest.fn();
   const bytes = new TextEncoder().encode(text);
-  const body = new ReadableStream<Uint8Array>({
-    start(controller) {
-      if (bytewise) {
-        for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
-      } else {
-        controller.enqueue(bytes);
-      }
-      if (close) controller.close();
+  // A fresh stream per attempt: the bounded retry (B1) legitimately issues a
+  // second request, and a reusable Response body would be locked by then.
+  let body: ReadableStream<Uint8Array> | undefined;
+  const make = (): ReadableStream<Uint8Array> => {
+    body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        if (bytewise) {
+          for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+        } else {
+          controller.enqueue(bytes);
+        }
+        if (close) controller.close();
+      },
+      cancel,
+    });
+    return body;
+  };
+  make();
+  global.fetch = jest.fn(() => Promise.resolve(new Response(make())));
+  return {
+    get body(): ReadableStream<Uint8Array> {
+      return body as ReadableStream<Uint8Array>;
     },
     cancel,
-  });
-  global.fetch = jest.fn(() => Promise.resolve(new Response(body)));
-  return { body, cancel };
+  };
 }
 
 async function rejected(promise: Promise<unknown>) {
@@ -565,7 +577,8 @@ describe('M8b tool protocol', () => {
       await client()
         .chatStreamWithTools(request, { onToken: jest.fn() })
         .catch(() => undefined);
-      expect(cancel).toHaveBeenCalledTimes(1);
+      // One cancel per attempt (B1 retries a malformed completion once).
+      expect(cancel).toHaveBeenCalled();
       expect(body.locked).toBe(false);
     }
   });

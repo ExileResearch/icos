@@ -76,6 +76,7 @@ import { buildContext } from './context.builder';
 import { ContextBudgetService } from './context-budget.service';
 import { ContextCompactionService } from './context-compaction.service';
 import type { ContextMemory } from './context.builder';
+import { TurnErrorsService } from '../observability/turn-errors.service';
 import { buildAttachmentBand } from './attachments';
 import type { TurnAttachment } from './attachments';
 import { AttachmentImageResolver } from './attachment-images';
@@ -257,6 +258,7 @@ export class ConversationService {
     @Optional() private readonly budget?: ContextBudgetService,
     @Optional() private readonly compaction?: ContextCompactionService,
     @Optional() private readonly subagents?: DelegationRepository,
+    @Optional() private readonly turnErrors?: TurnErrorsService,
   ) {}
 
   async converse(
@@ -356,7 +358,7 @@ export class ConversationService {
         });
       } catch (err) {
         this.finishRun(runId, 'failed', { reason: 'turn_error', toolSteps });
-        throw this.providerError(err);
+        throw this.failTurn(err, 'provider', id);
       }
       if (proposal.kind === 'tool_calls') {
         priorActions.push(...proposal.toolCalls.map((call) => call.name));
@@ -390,7 +392,7 @@ export class ConversationService {
         );
       } catch (err) {
         this.finishRun(runId, 'failed', { reason: 'turn_error', toolSteps });
-        throw this.ledgerError(err);
+        throw this.failTurn(err, 'ledger', id);
       }
       this.stepRun(
         runId,
@@ -429,7 +431,7 @@ export class ConversationService {
           record = await this.tools.resume(requestId, id);
         } catch (err) {
           this.finishRun(runId, 'failed', { reason: 'turn_error', toolSteps });
-          throw this.resumeError(err);
+          throw this.failTurn(err, 'resume', sessionId);
         }
       }
       if (record.state !== 'invalid') {
@@ -443,6 +445,7 @@ export class ConversationService {
           userText: message,
           history: turn.history,
           record,
+          attachments: options?.attachments,
         });
       } catch (err) {
         this.finishRun(runId, 'failed', { reason: 'turn_error', toolSteps });
@@ -521,7 +524,7 @@ export class ConversationService {
         reason: 'turn_error',
         toolSteps: 0,
       });
-      throw this.resumeError(err);
+      throw this.failTurn(err, 'resume', sessionId);
     }
     const userText = lastUserText(record);
     const history = await this.sessions.getContextMessages(record.sessionId);
@@ -563,7 +566,7 @@ export class ConversationService {
           reason: 'turn_error',
           toolSteps: 0,
         });
-        throw this.resumeError(err);
+        throw this.failTurn(err, 'resume', sessionId);
       }
       const settledUserText = lastUserText(settled.record);
       let outcome: TurnOutcome;
@@ -653,7 +656,7 @@ export class ConversationService {
           reason: 'turn_error',
           toolSteps: stored.toolCallCount + newExecutions,
         });
-        throw this.providerError(err);
+        throw this.failTurn(err, 'provider', record.sessionId);
       }
       if (proposal.kind === 'tool_calls') {
         priorActions.push(...proposal.toolCalls.map((call) => call.name));
@@ -691,7 +694,7 @@ export class ConversationService {
           reason: 'turn_error',
           toolSteps: stored.toolCallCount + newExecutions,
         });
-        throw this.ledgerError(err);
+        throw this.failTurn(err, 'ledger', record.sessionId);
       }
       this.stepRun(
         storedId,
@@ -733,7 +736,7 @@ export class ConversationService {
             reason: 'turn_error',
             toolSteps: stored.toolCallCount + newExecutions,
           });
-          throw this.resumeError(err);
+          throw this.failTurn(err, 'resume', sessionId);
         }
       }
       let outcome: TurnOutcome;
@@ -1046,6 +1049,7 @@ export class ConversationService {
               userText: message,
               history: turn.history,
               record,
+              attachments,
             });
           } catch (err) {
             this.finishRun(runId, 'failed', {
@@ -1094,6 +1098,12 @@ export class ConversationService {
           reason: cancelled ? 'cancelled' : 'turn_error',
           toolSteps,
         });
+        if (!cancelled) {
+          this.turnErrors?.recordError(err, {
+            requestId,
+            sessionId: id,
+          });
+        }
         emit({
           type: 'error',
           message: this.errorMessage(err),
@@ -1446,6 +1456,9 @@ export class ConversationService {
           reason: cancelled ? 'cancelled' : 'turn_error',
           toolSteps: 0,
         });
+        if (!cancelled) {
+          this.turnErrors?.recordError(err, { requestId, sessionId });
+        }
         emit({
           type: 'error',
           message: this.errorMessage(err),
@@ -2003,8 +2016,10 @@ export class ConversationService {
     userText: string;
     history: ChatMessage[];
     record: ToolExecutionRecord;
+    attachments?: readonly TurnAttachment[];
   }): Promise<TurnOutcome> {
     const { sessionId, requestId, userText, history, record } = input;
+    this.recordToolFailure(record);
     if (record.state === 'invalid') {
       throw new BadGatewayException(
         'The model returned an unusable tool proposal.',
@@ -2023,6 +2038,7 @@ export class ConversationService {
           history,
           content: record.input.proposal.content,
           model: record.input.proposal.model,
+          attachments: input.attachments,
         });
       }
       throw new BadGatewayException(
@@ -2073,6 +2089,7 @@ export class ConversationService {
         assistantText: notice,
         history,
         extract: false,
+        attachments: input.attachments,
       });
       return {
         status: 'ok',
@@ -2111,6 +2128,7 @@ export class ConversationService {
           assistantText: content,
           history,
           extract: true,
+          attachments: input.attachments,
         });
         return {
           status: 'ok',
@@ -2130,6 +2148,7 @@ export class ConversationService {
           assistantText: notice,
           history,
           extract: false,
+          attachments: input.attachments,
         });
         return {
           status: 'ok',
@@ -2165,7 +2184,12 @@ export class ConversationService {
     history: ChatMessage[];
     content: string;
     model: string;
+    attachments?: readonly TurnAttachment[];
   }): Promise<TurnOutcome> {
+    this.turnErrors?.checkReplyLeak(input.content, {
+      requestId: input.requestId,
+      sessionId: input.sessionId,
+    });
     await this.persistTurn({
       sessionId: input.sessionId,
       requestId: input.requestId,
@@ -2173,6 +2197,7 @@ export class ConversationService {
       assistantText: input.content,
       history: input.history,
       extract: true,
+      attachments: input.attachments,
     });
     return {
       status: 'ok',
@@ -2194,12 +2219,17 @@ export class ConversationService {
     assistantText: string;
     history: ChatMessage[];
     extract: boolean;
+    attachments?: readonly TurnAttachment[];
   }): Promise<void> {
     if (!this.tools.claimTranscript(input.requestId)) return;
-    const userRecord = await this.sessions.append(input.sessionId, {
-      role: 'user',
-      content: input.userText,
-    });
+    const userRecord = await this.sessions.append(
+      input.sessionId,
+      {
+        role: 'user',
+        content: input.userText,
+      },
+      input.attachments,
+    );
     await this.sessions.append(input.sessionId, {
       role: 'assistant',
       content: input.assistantText,
@@ -2385,6 +2415,34 @@ export class ConversationService {
         degraded: [`recall_error:${reason}`],
       });
       return { bands: { memoryBand: null, kbBand: null }, trace };
+    }
+  }
+
+  /**
+   * R1: record the terminal failure once, then map it for the client.
+   * Recording lives here (not in the mappers) so `providerError`'s fallback
+   * into `ledgerError` cannot double-count.
+   */
+  private failTurn(
+    err: unknown,
+    mapper: 'provider' | 'ledger' | 'resume',
+    sessionId?: string,
+  ): Error {
+    this.turnErrors?.recordError(err, sessionId ? { sessionId } : {});
+    if (mapper === 'provider') return this.providerError(err);
+    if (mapper === 'ledger') return this.ledgerError(err);
+    return this.resumeError(err);
+  }
+
+  /** R1: count a tool that ran and returned a failure code. */
+  private recordToolFailure(record: ToolExecutionRecord): void {
+    const execution = record.execution as
+      { ok?: boolean; failure?: { code?: string } } | null | undefined;
+    if (execution && execution.ok === false && execution.failure?.code) {
+      this.turnErrors?.recordToolFailure(execution.failure.code, {
+        sessionId: record.sessionId,
+        requestId: record.requestId,
+      });
     }
   }
 

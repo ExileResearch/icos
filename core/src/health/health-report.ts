@@ -92,7 +92,26 @@ export interface HealthReport {
   mcp?: McpHealth;
   /** Present only when the provider registry is wired. */
   providers?: ProviderHealth;
+  /** R1: turn-error counts (last 24h) once the ledger is wired. */
+  errors?: {
+    since: string;
+    total: number;
+    byBucket: Record<string, number>;
+    toolSyntaxLeaks: number;
+    last: { bucket: string; code: string; at: string } | null;
+  };
   host: HostHealth;
+}
+
+/** What health needs from the error ledger (structural, no coupling). */
+export interface TurnErrorSource {
+  counts(): {
+    since: string;
+    total: number;
+    byBucket: Partial<Record<string, number>>;
+    toolSyntaxLeaks: number;
+    last: { bucket: string; code: string; at: string } | null;
+  };
 }
 
 export interface HealthReportDeps {
@@ -104,6 +123,8 @@ export interface HealthReportDeps {
   mcp?: McpHealthSource;
   /** Optional: absent for callers without the provider registry. */
   providers?: ProviderHealthSource;
+  /** Optional: absent for callers without the turn-error ledger. */
+  errors?: TurnErrorSource;
 }
 
 /**
@@ -190,6 +211,9 @@ export async function buildHealthReport(
       : {}),
     ...(deps.providers
       ? { providers: await buildProviderHealth(deps.providers, probe) }
+      : {}),
+    ...(deps.errors
+      ? { errors: deps.errors.counts() as NonNullable<HealthReport['errors']> }
       : {}),
     host: hostHealth,
   };

@@ -17,7 +17,8 @@
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules RUVECTOR_CACHE_DIR=$HOME/.icos/models jest --watch",
     "test:cov": "NODE_OPTIONS=--experimental-vm-modules RUVECTOR_CACHE_DIR=$HOME/.icos/models jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "stories:render": "tsc test/stories/render.ts test/stories/registry.ts --outDir .stories-build --module commonjs --target es2022 --moduleResolution node --skipLibCheck --esModuleInterop && node -e \"const{renderStories}=require('./.stories-build/render.js');require('fs').writeFileSync('../.reference/plans/release-1.0-story-matrix.md',renderStories())\" && rm -rf .stories-build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0",

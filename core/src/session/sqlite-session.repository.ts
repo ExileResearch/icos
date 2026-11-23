@@ -11,6 +11,7 @@ import {
 } from './session.repository';
 import type {
   ContextSummary,
+  MessageAttachment,
   MessageRecord,
   Session,
   SessionSearchResult,
@@ -20,6 +21,52 @@ import type {
 const MAX_LIST_LIMIT = 100;
 const MAX_SEARCH_LIMIT = 100;
 const PREVIEW_LENGTH = 80;
+/** GH22: a message carries display metadata, never bytes. */
+const MAX_ATTACHMENTS = 20;
+const MAX_ATTACHMENT_URL_CHARS = 2048;
+const MAX_ATTACHMENT_NAME_CHARS = 120;
+const MAX_ATTACHMENT_TYPE_CHARS = 100;
+
+/**
+ * Keep only the display fields, bounded — the transcript is the system of
+ * record, so a malformed reference must never land in it.
+ */
+function normalizeAttachments(
+  value: readonly MessageAttachment[] | undefined,
+): MessageAttachment[] {
+  if (!value?.length) return [];
+  return value
+    .filter((item) => typeof item?.url === 'string' && item.url.length > 0)
+    .slice(0, MAX_ATTACHMENTS)
+    .map((item) => ({
+      url: item.url.slice(0, MAX_ATTACHMENT_URL_CHARS),
+      ...(typeof item.name === 'string' && item.name.trim()
+        ? { name: item.name.trim().slice(0, MAX_ATTACHMENT_NAME_CHARS) }
+        : {}),
+      ...(typeof item.contentType === 'string' && item.contentType.trim()
+        ? {
+            contentType: item.contentType
+              .trim()
+              .slice(0, MAX_ATTACHMENT_TYPE_CHARS),
+          }
+        : {}),
+      ...(typeof item.sizeBytes === 'number' && Number.isFinite(item.sizeBytes)
+        ? { sizeBytes: Math.max(0, Math.trunc(item.sizeBytes)) }
+        : {}),
+    }));
+}
+
+function readAttachments(raw: string | null): MessageAttachment[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? normalizeAttachments(parsed as MessageAttachment[])
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -69,25 +116,39 @@ export class SqliteSessionRepository extends SessionRepository {
   async appendMessage(
     sessionId: string,
     message: ChatMessage,
+    attachments?: readonly MessageAttachment[],
   ): Promise<MessageRecord> {
     if (message.role !== 'user' && message.role !== 'assistant') {
       throw new Error(`Unsupported message role "${message.role}"`);
     }
     const now = nowIso();
+    const kept = normalizeAttachments(attachments);
     const insert = this.database.transaction(
-      (sid: string, role: string, content: string, createdAt: string) => {
+      (
+        sid: string,
+        role: string,
+        content: string,
+        createdAt: string,
+        files: string | null,
+      ) => {
         const info = this.database
           .prepare(
-            'INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)',
+            'INSERT INTO messages (session_id, role, content, created_at, attachments) VALUES (?, ?, ?, ?, ?)',
           )
-          .run(sid, role, content, createdAt);
+          .run(sid, role, content, createdAt, files);
         this.database
           .prepare('UPDATE sessions SET updated_at = ? WHERE id = ?')
           .run(createdAt, sid);
         return info.lastInsertRowid;
       },
     );
-    const messageId = insert(sessionId, message.role, message.content, now);
+    const messageId = insert(
+      sessionId,
+      message.role,
+      message.content,
+      now,
+      kept.length ? JSON.stringify(kept) : null,
+    );
     return {
       id: Number(messageId),
       sessionId,
@@ -95,6 +156,7 @@ export class SqliteSessionRepository extends SessionRepository {
       content: message.content,
       createdAt: now,
       excludedFromContext: false,
+      ...(kept.length ? { attachments: kept } : {}),
     };
   }
 
@@ -125,7 +187,7 @@ export class SqliteSessionRepository extends SessionRepository {
       params.push(options.beforeId);
     }
     let sql =
-      `SELECT id, session_id, role, content, created_at, excluded_from_context ` +
+      `SELECT id, session_id, role, content, created_at, excluded_from_context, attachments ` +
       `FROM messages WHERE ${clauses.join(' AND ')} ORDER BY id DESC`;
     if (options?.limit !== undefined) {
       sql += ' LIMIT ?';
@@ -138,15 +200,20 @@ export class SqliteSessionRepository extends SessionRepository {
       content: string;
       created_at: string;
       excluded_from_context: number;
+      attachments: string | null;
     }[];
-    return rows.reverse().map((row) => ({
-      id: row.id,
-      sessionId: row.session_id,
-      role: row.role,
-      content: row.content,
-      createdAt: row.created_at,
-      excludedFromContext: row.excluded_from_context === 1,
-    }));
+    return rows.reverse().map((row) => {
+      const attachments = readAttachments(row.attachments);
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        role: row.role,
+        content: row.content,
+        createdAt: row.created_at,
+        excludedFromContext: row.excluded_from_context === 1,
+        ...(attachments.length ? { attachments } : {}),
+      };
+    });
   }
 
   async excludeLastTurn(sessionId: string): Promise<number[] | null> {

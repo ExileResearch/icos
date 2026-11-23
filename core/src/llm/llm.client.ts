@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CORE_CONFIG } from '../config';
 import { buildRequestHeaders } from './llm-provider';
 import type { LlmChatRequest } from './llm-provider';
@@ -16,6 +16,10 @@ export type {
   LlmToolCall,
   LlmToolRequest,
 } from './llm.protocol';
+
+/** B1: one retry, short backoff — bounded, not a retry loop. */
+const MAX_ATTEMPTS = 2;
+const RETRY_BACKOFF_MS = 250;
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -74,12 +78,22 @@ export interface StreamSink {
  * `httpStatus` is the status Core should report to its own caller:
  * 504 for timeouts/unreachable, 502 for everything else upstream.
  */
+export type LlmErrorCode =
+  | 'http'
+  | 'upstream_error'
+  | 'malformed'
+  | 'timeout'
+  | 'unreachable'
+  | 'aborted';
+
 export class LlmError extends Error {
   constructor(
     public readonly httpStatus: 502 | 504,
     message: string,
     public readonly retryable: boolean,
     public readonly cause?: unknown,
+    /** Stable classification for the R1 taxonomy (never shown to users). */
+    public readonly code: LlmErrorCode = 'http',
   ) {
     super(message);
     this.name = 'LlmError';
@@ -107,6 +121,8 @@ export function upstreamMessage(value: unknown): string {
 
 @Injectable()
 export class LlmClient {
+  private readonly logger = new Logger(LlmClient.name);
+
   constructor(
     @Inject(CORE_CONFIG) private readonly config: LlmEndpointConfig,
   ) {}
@@ -175,7 +191,59 @@ export class LlmClient {
     return { content: result.content, model: result.model };
   }
 
+  /**
+   * B1 — one bounded retry for a 502-class failure that produced no output:
+   * a provider HTTP error, an error envelope, or a malformed completion. A
+   * timeout (504) is not retried here (it already consumed its budget), and a
+   * stream that already emitted a token is never replayed — that would
+   * duplicate text in the transcript.
+   */
   private async complete(
+    request: LlmChatRequest | LlmToolRequest,
+    sink?: StreamSink,
+    clientSignal?: AbortSignal,
+    offer?: ToolOffer,
+  ): Promise<LlmResult> {
+    let emitted = false;
+    const watched: StreamSink | undefined = sink
+      ? {
+          ...sink,
+          onToken: (token: string) => {
+            emitted = true;
+            sink.onToken(token);
+          },
+        }
+      : undefined;
+
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await this.attempt(request, watched, clientSignal, offer);
+      } catch (err) {
+        if (!this.shouldRetry(err, attempt, emitted, clientSignal)) throw err;
+        await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+      }
+    }
+  }
+
+  private shouldRetry(
+    err: unknown,
+    attempt: number,
+    emitted: boolean,
+    clientSignal?: AbortSignal,
+  ): boolean {
+    if (attempt >= MAX_ATTEMPTS) return false;
+    if (emitted) return false;
+    if (clientSignal?.aborted) return false;
+    if (!(err instanceof LlmError)) return false;
+    if (err.httpStatus !== 502) return false;
+    return (
+      err.code === 'http' ||
+      err.code === 'malformed' ||
+      err.code === 'upstream_error'
+    );
+  }
+
+  private async attempt(
     request: LlmChatRequest | LlmToolRequest,
     sink?: StreamSink,
     clientSignal?: AbortSignal,
@@ -214,6 +282,8 @@ export class LlmClient {
           504,
           'LLM endpoint unreachable or request aborted',
           true,
+          undefined,
+          'unreachable',
         );
       }
       signal.throwIfAborted();
@@ -225,6 +295,8 @@ export class LlmClient {
             detail ? `: ${detail}` : ''
           }`,
           res.status >= 500,
+          undefined,
+          'http',
         );
       }
       if (!res.body) throw protocolError();
@@ -244,7 +316,12 @@ export class LlmClient {
       signal.throwIfAborted();
       const parsed = parseJson(text);
       this.throwIfUpstreamError(parsed);
-      return parser.response(parsed);
+      try {
+        return parser.response(parsed);
+      } catch (err) {
+        this.logInvalidPayload(text, err);
+        throw err;
+      }
     } catch (err) {
       if (signal.aborted) {
         throw this.providerError(
@@ -253,6 +330,8 @@ export class LlmClient {
             ? `LLM endpoint timed out after ${config.llmTimeoutMs}ms`
             : 'LLM request aborted',
           timedOut,
+          undefined,
+          timedOut ? 'timeout' : 'aborted',
         );
       }
       if (err instanceof LlmError) throw err;
@@ -284,8 +363,28 @@ export class LlmClient {
   private throwIfUpstreamError(parsed: unknown): void {
     const message = upstreamMessage(parsed);
     if (message) {
-      throw this.providerError(502, `LLM endpoint error: ${message}`, false);
+      throw this.providerError(
+        502,
+        `LLM endpoint error: ${message}`,
+        false,
+        undefined,
+        'upstream_error',
+      );
     }
+  }
+
+  /**
+   * Bounded diagnostic for a structurally invalid completion. "invalid
+   * completion" alone cannot distinguish truncation, an error envelope, or a
+   * provider quirk; log a short whitespace-collapsed preview. Response frames
+   * only — never headers, the request, or credentials.
+   */
+  private logInvalidPayload(raw: string, err: unknown): void {
+    if (!(err instanceof LlmError)) return;
+    const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 300);
+    this.logger.warn(
+      `[${this.endpoint().provider}] invalid completion payload: ${preview || '<empty>'}`,
+    );
   }
 
   /** Tag errors with the provider id. Never include credentials. */
@@ -294,12 +393,14 @@ export class LlmClient {
     message: string,
     retryable: boolean,
     cause?: unknown,
+    code: LlmErrorCode = 'http',
   ): LlmError {
     return new LlmError(
       httpStatus,
       `[${this.endpoint().provider}] ${message}`,
       retryable,
       cause,
+      code,
     );
   }
 
@@ -360,7 +461,25 @@ export class LlmClient {
         if (strict) throw err;
         return false;
       }
-      parser.chunk(value, sink);
+      // Providers can report failure *inside* a 200 stream (DMR sends
+      // `data: {"error":{"code":500,"message":"Compute error."}}`). Surface
+      // the provider's own words instead of an opaque protocol violation.
+      const upstream = upstreamMessage(value);
+      if (upstream) {
+        throw this.providerError(
+          502,
+          `LLM endpoint error: ${upstream}`,
+          false,
+          undefined,
+          'upstream_error',
+        );
+      }
+      try {
+        parser.chunk(value, sink);
+      } catch (err) {
+        this.logInvalidPayload(payload, err);
+        throw err;
+      }
       signal.throwIfAborted();
       return false;
     };

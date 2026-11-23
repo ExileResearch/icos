@@ -19,6 +19,17 @@ export interface SessionSummary {
   preview?: string;
 }
 
+/**
+ * Display metadata for a file attached to a message (GH22). References only:
+ * the bytes live in the attachment store, the transcript keeps the pointer.
+ */
+export interface MessageAttachment {
+  name?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  url: string;
+}
+
 export interface MessageRecord {
   id: number;
   sessionId: string;
@@ -30,6 +41,8 @@ export interface MessageRecord {
    * (evidence is never destroyed) but leave LLM context construction.
    */
   excludedFromContext: boolean;
+  /** Files attached to this message, when any (GH22). */
+  attachments?: readonly MessageAttachment[];
 }
 
 export interface SessionSearchResult {
@@ -72,6 +85,7 @@ export abstract class SessionRepository {
   abstract appendMessage(
     sessionId: string,
     message: ChatMessage,
+    attachments?: readonly MessageAttachment[],
   ): Promise<MessageRecord>;
 
   abstract getMessages(

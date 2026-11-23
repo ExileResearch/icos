@@ -17,6 +17,20 @@ CREATE TABLE IF NOT EXISTS sessions (
     title TEXT
 );
 
+CREATE TABLE IF NOT EXISTS turn_errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    bucket TEXT NOT NULL,
+    code TEXT NOT NULL,
+    http_status INTEGER,
+    request_id TEXT,
+    session_id TEXT,
+    detail TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_turn_errors_at
+ON turn_errors(at);
+
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL,
@@ -24,6 +38,9 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL,
     excluded_from_context INTEGER NOT NULL DEFAULT 0,
+    -- GH22: uploaded files attached to this message, as a JSON array. Display
+    -- metadata only; never part of the LLM context.
+    attachments TEXT,
 
     FOREIGN KEY (session_id)
         REFERENCES sessions(id)
@@ -931,6 +948,8 @@ function migrateColumns(db: Database.Database, schema: DatabaseSchema): void {
       'excluded_from_context',
       'INTEGER NOT NULL DEFAULT 0',
     );
+    // GH22: transcripts written before attachment metadata was kept.
+    addColumnIfMissing(db, 'messages', 'attachments', 'TEXT');
     migrateToolRequests(db);
     migrateAgentRuns(db);
     addColumnIfMissing(

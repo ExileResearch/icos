@@ -1,4 +1,5 @@
 .composer {
+  position: relative;
   border-top: 1px solid var(--border-default);
   padding: 0.75rem;
   display: flex;
@@ -142,4 +143,60 @@
 
 .attachments li button:hover {
   color: var(--text-primary);
+}
+
+/* Slash-command suggestions (GH20): a popover above the composer. */
+.command-menu {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(100% + 0.25rem);
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 17.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border-default);
+  border-radius: 0.5rem;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-glass);
+  z-index: 20;
+}
+
+.command-menu li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+}
+
+.command-menu li.active {
+  /* Sage tint + accent bar: readable in both themes, and unmistakably "this
+     is what Enter will insert". */
+  background: color-mix(in srgb, var(--accent-sage) 20%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent-sage-deep);
+}
+
+.command-menu li.active .command,
+.command-menu li.active .command-description {
+  color: var(--text-primary);
+}
+
+.command-menu .command {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+}
+
+.command-menu .command-description {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
 }

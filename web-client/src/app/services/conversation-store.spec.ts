@@ -75,6 +75,34 @@ describe('ConversationStore', () => {
     expect(store.pendingText()).toBeNull();
   });
 
+  it('keeps attachments on the user message (GH22)', async () => {
+    emit([
+      { type: 'meta', sessionId: 's1', model: 'm', requestId: 'r1' },
+      { type: 'done', reply: 'ok', model: 'm', requestId: 'r1', status: 'ok' },
+    ]);
+    const attachment = {
+      url: '/core/attachments/11111111-1111-1111-1111-111111111111',
+      name: 'cat.png',
+      contentType: 'image/png',
+      sizeBytes: 10,
+    };
+
+    await store.sendMessage({ message: 'look', attachments: [attachment] });
+
+    const user = store.messages().find((message) => message.role === 'user');
+    expect(user).toMatchObject({
+      role: 'user',
+      content: 'look',
+      attachments: [attachment],
+    });
+    expect(streams.streamTurn).toHaveBeenCalledWith(
+      'look',
+      null,
+      [attachment],
+      expect.objectContaining({ onEvent: expect.any(Function) }),
+    );
+  });
+
   it('should park an approval_required turn and resume exactly once on approve', async () => {
     emit([
       { type: 'meta', sessionId: 's1', model: 'm', requestId: 'r1' },

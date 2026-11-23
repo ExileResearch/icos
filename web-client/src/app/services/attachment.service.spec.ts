@@ -16,6 +16,10 @@ const STORED: StoredAttachment = {
 };
 
 describe('AttachmentService', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('uploads a file as multipart and returns the stored reference', async () => {
     const postForm = vi.fn(
       (endpoint: string, form: FormData): Promise<StoredAttachment> => {
@@ -42,5 +46,46 @@ describe('AttachmentService', () => {
     const stored = form.get('file') as File;
     expect(stored.name).toBe('a.png');
     expect(stored.type).toBe('image/png');
+  });
+
+  it('fetches a stored attachment preview with the session cookie (GH22)', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response(new Blob(['x']), { status: 200 })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    TestBed.configureTestingModule({
+      providers: [
+        AttachmentService,
+        { provide: CoreApiService, useValue: { postForm: vi.fn() } },
+      ],
+    });
+    const service = TestBed.inject(AttachmentService);
+
+    const blob = await service.preview(
+      '/core/attachments/11111111-1111-1111-1111-111111111111',
+    );
+
+    expect(blob).not.toBeNull();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(
+      'http://localhost:3000/core/attachments/11111111-1111-1111-1111-111111111111',
+    );
+    expect(init).toMatchObject({ credentials: 'include' });
+  });
+
+  it('never requests an arbitrary URL from a transcript (GH22)', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    TestBed.configureTestingModule({
+      providers: [
+        AttachmentService,
+        { provide: CoreApiService, useValue: { postForm: vi.fn() } },
+      ],
+    });
+    const service = TestBed.inject(AttachmentService);
+
+    expect(await service.preview('https://example.test/x.png')).toBeNull();
+    expect(await service.preview('/core/attachments/../../secrets')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

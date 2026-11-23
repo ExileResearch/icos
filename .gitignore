@@ -24,5 +24,9 @@ session-*.md
 .reference/notes/memory-system-feedback.md
 .reference/notes/tools-out-of-context.md
 .reference/notes/self-coding/
+.reference/notes
 .reference/legacy
 .reference/papers
+
+lines.md
+.stories-build/

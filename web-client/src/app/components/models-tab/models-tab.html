@@ -131,103 +131,126 @@
   </table>
 
   @if (formOpen()) {
-    <form class="editor" [formGroup]="form" (ngSubmit)="submit()" aria-label="Provider editor">
-      <h2>{{ editingId() ? 'Edit provider' : 'Add provider' }}</h2>
+    <div class="modal-backdrop" (click)="cancel()">
+      <div
+        #editorDialog
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        aria-labelledby="provider-editor-title"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="modal-head">
+          <h2 id="provider-editor-title">
+            {{ editingId() ? 'Edit provider' : 'Add provider' }}
+          </h2>
+          <span class="grow"></span>
+          <button type="button" class="modal-close" (click)="cancel()">Close</button>
+        </div>
 
-      <label for="p-id">Id</label>
-      <input id="p-id" formControlName="id" autocomplete="off" />
+        <form class="editor" [formGroup]="form" (ngSubmit)="submit()" aria-label="Provider editor">
+          <label for="p-id">Id</label>
+          <input id="p-id" formControlName="id" autocomplete="off" />
 
-      <label for="p-base">Base URL</label>
-      <input id="p-base" formControlName="baseUrl" autocomplete="off" />
+          <label for="p-base">Base URL</label>
+          <input id="p-base" formControlName="baseUrl" autocomplete="off" />
 
-      <label for="p-model">Model</label>
-      <div class="model-row">
-        <input
-          id="p-model"
-          formControlName="model"
-          autocomplete="off"
-          list="editor-models"
-        />
-        <button type="button" (click)="loadEditorModels()" [disabled]="busy()">
-          Load models
-        </button>
+          <label for="p-model">Model</label>
+          <div class="model-row">
+            <input
+              id="p-model"
+              formControlName="model"
+              autocomplete="off"
+              list="editor-models"
+            />
+            <button type="button" (click)="loadEditorModels()" [disabled]="busy()">
+              Load models
+            </button>
+          </div>
+          <datalist id="editor-models">
+            @for (m of editorModels(); track m.id) {
+              <option [value]="m.id"></option>
+            }
+          </datalist>
+
+          <label for="p-key">API key</label>
+          <input
+            id="p-key"
+            formControlName="apiKeyRef"
+            autocomplete="off"
+            list="vault-secrets"
+            placeholder="paste the key, or secret:NAME / $VAR"
+          />
+          <datalist id="vault-secrets">
+            @for (s of secrets(); track s.name) {
+              <option [value]="'secret:' + s.name"></option>
+            }
+          </datalist>
+          <p class="hint">
+            Paste the key — it is stored in the encrypted vault and referenced
+            (never written to the catalog). Or enter
+            <span class="mono">secret:NAME</span> to reuse a stored secret, or
+            <span class="mono">$VAR</span> for an environment variable.
+            @if (!vaultWritable()) {
+              <strong>The vault is disabled — enable it to store keys.</strong>
+            }
+          </p>
+
+          <label for="p-headers">Headers (optional)</label>
+          <textarea
+            id="p-headers"
+            formControlName="headers"
+            rows="2"
+            spellcheck="false"
+            placeholder="HTTP-Referer=$REFERER"
+          ></textarea>
+          <p class="hint">
+            One per line, <span class="mono">NAME=$VAR</span> or
+            <span class="mono">NAME=secret:NAME</span>. Values are references,
+            never literals. Example (OpenRouter attribution):
+            <span class="mono">HTTP-Referer=$REFERER</span>.
+          </p>
+
+          <label for="p-ua">User agent (optional)</label>
+          <input
+            id="p-ua"
+            formControlName="userAgent"
+            autocomplete="off"
+            placeholder="icos/&lt;version&gt;"
+          />
+          <p class="hint">
+            Identifies the client to the provider. Defaults to
+            <span class="mono">icos/&lt;version&gt;</span>.
+          </p>
+
+          <label for="p-timeout">Timeout (ms)</label>
+          <input
+            id="p-timeout"
+            formControlName="timeoutMs"
+            inputmode="numeric"
+            autocomplete="off"
+          />
+
+          <label for="p-window">Context window (tokens)</label>
+          <input
+            id="p-window"
+            formControlName="contextWindow"
+            inputmode="numeric"
+            autocomplete="off"
+          />
+
+          <label class="inline">
+            <input type="checkbox" formControlName="enabled" />
+            Enabled
+          </label>
+
+          <div class="actions">
+            <button type="submit" [disabled]="busy()">Save</button>
+            <button type="button" (click)="cancel()" [disabled]="busy()">Cancel</button>
+          </div>
+        </form>
       </div>
-      <datalist id="editor-models">
-        @for (m of editorModels(); track m.id) {
-          <option [value]="m.id"></option>
-        }
-      </datalist>
-
-      <label for="p-key">API key</label>
-      <input
-        id="p-key"
-        formControlName="apiKeyRef"
-        autocomplete="off"
-        list="vault-secrets"
-        placeholder="paste the key, or secret:NAME / $VAR"
-      />
-      <datalist id="vault-secrets">
-        @for (s of secrets(); track s.name) {
-          <option [value]="'secret:' + s.name"></option>
-        }
-      </datalist>
-      <p class="hint">
-        Paste the key — it is stored in the encrypted vault and referenced
-        (never written to the catalog). Or enter
-        <span class="mono">secret:NAME</span> to reuse a stored secret, or
-        <span class="mono">$VAR</span> for an environment variable.
-        @if (!vaultWritable()) {
-          <strong>The vault is disabled — enable it to store keys.</strong>
-        }
-      </p>
-
-      <label for="p-headers">Headers (optional)</label>
-      <textarea
-        id="p-headers"
-        formControlName="headers"
-        rows="2"
-        spellcheck="false"
-        placeholder="HTTP-Referer=$REFERER"
-      ></textarea>
-      <p class="hint">
-        One per line, <span class="mono">NAME=$VAR</span> or
-        <span class="mono">NAME=secret:NAME</span>. Values are references, never
-        literals. Example (OpenRouter attribution):
-        <span class="mono">HTTP-Referer=$REFERER</span>.
-      </p>
-
-      <label for="p-ua">User agent (optional)</label>
-      <input
-        id="p-ua"
-        formControlName="userAgent"
-        autocomplete="off"
-        placeholder="icos/&lt;version&gt;"
-      />
-      <p class="hint">
-        Identifies the client to the provider. Defaults to
-        <span class="mono">icos/&lt;version&gt;</span>.
-      </p>
-
-      <label for="p-timeout">Timeout (ms)</label>
-      <input id="p-timeout" formControlName="timeoutMs" inputmode="numeric" autocomplete="off" />
-
-      <label for="p-window">Context window (tokens)</label>
-      <input
-        id="p-window"
-        formControlName="contextWindow"
-        inputmode="numeric"
-        autocomplete="off"
-      />
-
-      <label class="inline">
-        <input type="checkbox" formControlName="enabled" />
-        Enabled
-      </label>
-
-      <div class="actions">
-        <button type="submit" [disabled]="busy()">Save</button>
-        <button type="button" (click)="cancel()" [disabled]="busy()">Cancel</button>
-      </div>
-    </form>
+    </div>
   }
 </section>

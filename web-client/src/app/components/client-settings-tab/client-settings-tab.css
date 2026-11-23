@@ -53,11 +53,6 @@
   font-size: 0.875rem;
 }
 
-.hint {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
 .theme-row {
   display: flex;
   gap: 1rem;

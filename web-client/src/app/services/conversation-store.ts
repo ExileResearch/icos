@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import type { Approval } from '../models/approval';
 import type { ApprovalDecision } from '../models/approval';
 import type { Clarification } from '../models/clarification';
-import type { ComposerSubmission } from '../models/attachment';
+import type { ComposerSubmission, TurnAttachment } from '../models/attachment';
 import type { ChatMessage, MessageRole } from '../models/message';
 import type { SessionSummary, SessionSearchResult } from '../models/session';
 import type { ParkedResume, StreamEvent } from '../models/stream-event';
@@ -88,6 +88,7 @@ export class ConversationStore {
           content: m.content,
           excludedFromContext: m.excludedFromContext,
           createdAt: m.createdAt,
+          ...(m.attachments?.length ? { attachments: m.attachments } : {}),
         })),
       );
     } catch (error) {
@@ -121,7 +122,7 @@ export class ConversationStore {
     if (!message || this.busy()) {
       return;
     }
-    this.appendMessage('user', message);
+    this.appendMessage('user', message, attachments);
     this.busy.set(true);
     this.startPending('Thinking...');
     try {
@@ -302,10 +303,20 @@ export class ConversationStore {
     await this.refreshQuestions();
   }
 
-  private appendMessage(role: MessageRole, content: string): void {
+  private appendMessage(
+    role: MessageRole,
+    content: string,
+    attachments: readonly TurnAttachment[] = [],
+  ): void {
     this.messages.update((current) => [
       ...current,
-      { role, content, excludedFromContext: false, createdAt: nowIso() },
+      {
+        role,
+        content,
+        excludedFromContext: false,
+        createdAt: nowIso(),
+        ...(attachments.length ? { attachments } : {}),
+      },
     ]);
   }
 

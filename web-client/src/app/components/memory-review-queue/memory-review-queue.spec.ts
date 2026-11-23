@@ -122,6 +122,24 @@ describe('MemoryReviewQueue', () => {
     expect(review.approve).toHaveBeenCalledWith('j1');
   });
 
+  it('rejects a candidate through the service (MEM-003)', () => {
+    component.reject(ROW as never);
+    expect(review.reject).toHaveBeenCalledWith('j1');
+  });
+
+  it('bulk-approves after an inline confirmation (MEM-004)', () => {
+    component.requestBulk('approve');
+    expect(component.pendingBulk()).toBe('approve');
+    component.confirmBulk();
+    expect(review.bulkResolve).toHaveBeenCalledWith('approve');
+  });
+
+  it('bulk-rejects after an inline confirmation (MEM-005)', () => {
+    component.requestBulk('reject');
+    component.confirmBulk();
+    expect(review.bulkResolve).toHaveBeenCalledWith('reject');
+  });
+
   it('should render the failure detail verbatim', () => {
     const failed = { ...ROW, state: 'failed', detail: 'missing_candidate' };
     expect(component.stateLabel(failed as never)).toBe('Failed — missing_candidate');

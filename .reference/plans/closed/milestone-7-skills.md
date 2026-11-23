@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft rev.3 (2026-09-13). Implements README question **M7 → *Can it acquire capabilities?***
+Draft rev.3 (2026-09-13). Implements README question **M7 → _Can it acquire capabilities?_**
 
 Rev.2 correction: the original draft treated **explicit per-session
 activation** (`/skills use <name>`) as the primary skill mechanism. That is
@@ -52,7 +52,7 @@ Target behavior:
 
 ```text
 User:
-"Today we're working on the ICOS v3 stack. Let's clean up the memory architecture."
+"Today we're working on the ICOS stack. Let's clean up the memory architecture."
 
         ↓
 
@@ -60,11 +60,11 @@ Skill discovery
 
         ↓
 
-icos-v3-stack identified as relevant
+icos-stack identified as relevant
 
         ↓
 
-SKILL.md loaded from ~/.icos/skills/icos-v3-stack/
+SKILL.md loaded from ~/.icos/skills/icos-stack/
 
         ↓
 
@@ -72,17 +72,17 @@ skill injected into model context
 
         ↓
 
-LLM responds with ICOS v3 architectural context available
+LLM responds with ICOS architectural context available
 ```
 
 The goal is the smallest skill system that later milestones can rely upon for:
 
-* procedural knowledge (`daily-journal`, `comments-pass`, …)
-* user-defined workflows (`new-idea-deconstruction`, `capture-idea`, …)
-* stack/project context skills (`icos-v3-stack`, …)
-* plugin-provided skills (see `.reference/notes/integrations-and-plugins.md`)
-* tool-adjacent procedures that M8 will make executable
-* memory-adjacent procedures that M10–M12 will learn from
+- procedural knowledge (`daily-journal`, `comments-pass`, …)
+- user-defined workflows (`new-idea-deconstruction`, `capture-idea`, …)
+- stack/project context skills (`icos-stack`, …)
+- plugin-provided skills (see `.reference/notes/integrations-and-plugins.md`)
+- tool-adjacent procedures that M8 will make executable
+- memory-adjacent procedures that M10–M12 will learn from
 
 Reference inputs:
 
@@ -112,7 +112,7 @@ Skill:  KNOWLEDGE of how to do something (prompt text)
 Tool:   ABILITY to do something in the world (code execution)
 ```
 
-M7 ships skills. M8 ships tools. A skill body may *describe* a procedure
+M7 ships skills. M8 ships tools. A skill body may _describe_ a procedure
 that will later map to tools, but M7 executes nothing.
 
 ### 2. Skills ≠ memory
@@ -130,7 +130,7 @@ the canonical source of truth:
 
 ```text
 ~/.icos/skills/
-    icos-v3-stack/
+    icos-stack/
         SKILL.md
     daily-journal/
         SKILL.md
@@ -157,7 +157,7 @@ Per `integrations-and-plugins.md`:
                TOOLS     SUBAGENTS
 ```
 
-A plugin *may provide* skills, but M7 does not build the plugin lifecycle
+A plugin _may provide_ skills, but M7 does not build the plugin lifecycle
 (manifest / connect / sync / events). M7 builds the **skill layer only**,
 with a directory layout a future plugin installer can drop files into.
 
@@ -247,7 +247,7 @@ Live-instance canonical location (per `.reference/status.md`):
 
 ```text
 ~/.icos/skills/
-├── icos-v3-stack/
+├── icos-stack/
 │   └── SKILL.md
 ├── daily-journal/
 │   └── SKILL.md
@@ -259,15 +259,15 @@ Live-instance canonical location (per `.reference/status.md`):
 
 Rules:
 
-* One directory per skill. Directory name **must equal** the skill `name`
+- One directory per skill. Directory name **must equal** the skill `name`
   declared in frontmatter (mismatch → skill rejected with reason).
-* Exactly one entry file per skill directory: `SKILL.md` (case-sensitive).
-* Extra files inside the skill directory (e.g. `references.md`,
+- Exactly one entry file per skill directory: `SKILL.md` (case-sensitive).
+- Extra files inside the skill directory (e.g. `references.md`,
   `template.md`) are **ignored in M7** — never loaded, never injected.
   (Progressive disclosure of bundled resources is a post-M9 optimization.)
-* Hidden directories (`.`-prefixed), broken symlinks, and symlinks escaping
+- Hidden directories (`.`-prefixed), broken symlinks, and symlinks escaping
   `SKILLS_DIR` are skipped with a counted warning, never followed.
-* Empty catalog (directory missing or zero valid skills) is a **valid state**:
+- Empty catalog (directory missing or zero valid skills) is a **valid state**:
   Core boots, `/skills` reports empty, conversation works unchanged.
 
 ## 2. Skill File Format
@@ -305,11 +305,11 @@ interface SkillFrontmatter {
 
 Body rules:
 
-* Body is Markdown-as-prompt-text, 1–12_000 chars after trimming.
-* Body must not be empty.
-* Unknown frontmatter keys are **rejected** (fail closed — catches typos
+- Body is Markdown-as-prompt-text, 1–12_000 chars after trimming.
+- Body must not be empty.
+- Unknown frontmatter keys are **rejected** (fail closed — catches typos
   like `descripton:` rather than silently ignoring them).
-* No executable semantics in M7. Frontmatter keys such as `exec`,
+- No executable semantics in M7. Frontmatter keys such as `exec`,
   `script`, `hooks`, `tools`, `permissions` are **rejected as unknown**.
   (Tool bindings arrive in M8 through an explicit allowlist, not by
   smuggling keys into this format now.)
@@ -357,14 +357,14 @@ interface SkillLoader {
 
 Requirements:
 
-* `scan()` parses frontmatter for every candidate directory but defers
+- `scan()` parses frontmatter for every candidate directory but defers
   body reads. Bodies load through `loadBody()` with a small in-memory cache
   keyed by name; `/skills refresh` (re-scan) invalidates the cache.
-* No new native dependencies. Frontmatter parsing: implement a **minimal**
+- No new native dependencies. Frontmatter parsing: implement a **minimal**
   `---`-delimited parser for the three known keys, or add `js-yaml` iff
   the parser exceeds ~60 lines. Prefer the smaller diff.
-* `scan()` is idempotent: rebuilds descriptor state from disk, replacing it.
-* Loader never contacts the LLM, never touches SQLite, never writes to
+- `scan()` is idempotent: rebuilds descriptor state from disk, replacing it.
+- Loader never contacts the LLM, never touches SQLite, never writes to
   `SKILLS_DIR`.
 
 ## 4. Registry
@@ -374,11 +374,11 @@ body cache. No SQLite table in M7 — skills are content-addressed by the
 filesystem, and the evidence for "what happened" stays in the session
 transcript.
 
-* Duplicate names (case-insensitive): first wins deterministically
+- Duplicate names (case-insensitive): first wins deterministically
   (sorted directory order), remainder reported as `duplicate` skips.
-* Registry exposes `listDescriptors()` sorted alphabetically — deterministic
+- Registry exposes `listDescriptors()` sorted alphabetically — deterministic
   output for `/skills`, discovery, and catalog-context construction.
-* Registry is owned by a `SkillService` (`@Injectable`, in
+- Registry is owned by a `SkillService` (`@Injectable`, in
   `core/src/skills/`), following the `DisplayPreferenceStore` /
   `HostHealthProvider` provider pattern — not a controller, not middleware.
 
@@ -398,13 +398,13 @@ SKILLS_MAX_AUTO_LOADED_PER_TURN=2    # cap on contextually loaded skills per tur
 SKILLS_MAX_CONTEXT_CHARS=8000        # cap on total skill-body chars per turn (provisional)
 ```
 
-* `SKILLS_DIR_PATH` reuses the existing `resolvePath` helper (same `~/`
+- `SKILLS_DIR_PATH` reuses the existing `resolvePath` helper (same `~/`
   semantics as `SESSION_DB_PATH` / `MEMORY_DB_PATH`).
-* Document all seven in `core/.env.sample` with the defaults above.
-* `SKILLS_ENABLED=false` must make the system behave exactly as pre-M7:
+- Document all seven in `core/.env.sample` with the defaults above.
+- `SKILLS_ENABLED=false` must make the system behave exactly as pre-M7:
   no loader scan, no catalog block, no discovery, `/skills*` returns a
   deterministic "skills disabled" message, conversation byte-identical.
-* The two `AUTO/CONTEXT` caps are provisional — exact values determined
+- The two `AUTO/CONTEXT` caps are provisional — exact values determined
   during implementation against live context-window behavior and recorded
   in evidence. The invariant is fixed: **bounded, never unbounded**.
 
@@ -420,11 +420,11 @@ persist transcript or trigger extraction (M6 invariant preserved).
 /skills refresh              — re-scan SKILLS_DIR, report loaded/skipped counts, drop body cache
 ```
 
-* Unknown skill → deterministic 404-style command error (same pattern as
+- Unknown skill → deterministic 404-style command error (same pattern as
   unknown session / unknown approval — never LLM).
-* `/skills refresh` is the M7 cache-invalidation story. No file watcher in
+- `/skills refresh` is the M7 cache-invalidation story. No file watcher in
   M7 (watchers are a reliability liability; explicit refresh is testable).
-* Output through the existing `CommandResult` contract (`kind: "data"` +
+- Output through the existing `CommandResult` contract (`kind: "data"` +
   human-readable `text`); the test client renders it as a system notice,
   same as other command results.
 
@@ -449,10 +449,10 @@ Example:
 
 ```text
 Input:
-"we're working on the ICOS v3 stack"
+"we're working on the ICOS stack"
 
 Potential match:
-icos-v3-stack
+icos-stack
 ```
 
 ## 1. Discovery Contract
@@ -469,14 +469,14 @@ interface SkillDiscovery {
 }
 ```
 
-* Discovery operates on **descriptors only** — it never reads bodies.
-* Malformed/skipped skills are excluded (they are not in the registry).
-* Empty/blank input → zero matches (never "match everything").
-* Result count bounded by caller-supplied `limit` (default 5).
-* Ranking deterministic: name hits score above description hits;
+- Discovery operates on **descriptors only** — it never reads bodies.
+- Malformed/skipped skills are excluded (they are not in the registry).
+- Empty/blank input → zero matches (never "match everything").
+- Result count bounded by caller-supplied `limit` (default 5).
+- Ranking deterministic: name hits score above description hits;
   alphabetical tiebreak on skill name. Same input + same catalog ⇒ same
   output, byte for byte.
-* `SKILLS_ENABLED=false` → discovery returns empty, always.
+- `SKILLS_ENABLED=false` → discovery returns empty, always.
 
 The exact scoring weights stay simple (e.g. name-substring = 2,
 description-substring = 1, multi-token partial credit). Document the
@@ -497,7 +497,7 @@ interface SkillSelector {
 
 interface SelectionBudget {
   maxSkills: number; // SKILLS_MAX_AUTO_LOADED_PER_TURN
-  maxChars: number;  // SKILLS_MAX_CONTEXT_CHARS
+  maxChars: number; // SKILLS_MAX_CONTEXT_CHARS
 }
 ```
 
@@ -511,21 +511,21 @@ fill-to-budget in rank order, alphabetical tiebreak. Future selectors
 /skills suggest <free text>   — ranked candidates from the same engine, top 5
 ```
 
-* The same `discoverSkills()` call the automatic path uses — this is the
+- The same `discoverSkills()` call the automatic path uses — this is the
   observability/debugging surface for "what does ICOS think is relevant?"
-* Returns names (+ matched-on reason) only — never activates, never injects
+- Returns names (+ matched-on reason) only — never activates, never injects
   bodies.
-* Deterministic; testable against a fixture catalog.
+- Deterministic; testable against a fixture catalog.
 
 ## 4. Discovery ≠ Activation (hard boundary)
 
-* `discoverSkills()` is pure: input + registry ⇒ matches. No session
+- `discoverSkills()` is pure: input + registry ⇒ matches. No session
   writes, no active-set mutation, no transcript writes, no LLM calls.
-* A discovered skill is **not** an active skill until either the user
+- A discovered skill is **not** an active skill until either the user
   explicitly activates it (`/skills use`) or the turn-scoped loader (M7c)
   admits it for the current turn only.
-* The model cannot invoke discovery or promote a match by emitting text —
-  same invariant as M6b approvals: *LLM text never changes runtime state*.
+- The model cannot invoke discovery or promote a match by emitting text —
+  same invariant as M6b approvals: _LLM text never changes runtime state_.
 
 ---
 
@@ -558,32 +558,32 @@ M7 supports three distinct skill scopes. Do not conflate them.
 ### Explicit session activation (control mechanism)
 
 ```text
-/skills use icos-v3-stack
+/skills use icos-stack
         ↓
 activate (session-pinned)
         ↓
 context (every subsequent turn until dropped)
 ```
 
-* `/skills use <name>` adds to the session's explicit active set;
+- `/skills use <name>` adds to the session's explicit active set;
   `/skills drop <name>` removes; `/skills active` inspects both scopes
   (see §M7c.4).
-* Active set lives in `SkillService` memory: `Map<sessionId, Set<string>>`.
+- Active set lives in `SkillService` memory: `Map<sessionId, Set<string>>`.
   No SQLite migration in M7 (session-metadata persistence is an M8/M9
   concern alongside execution state). Document the limitation: active sets
   clear on restart; transcript is unaffected.
-* Cap: `SKILLS_MAX_ACTIVE_PER_SESSION` (default 5). Exceeding → deterministic
+- Cap: `SKILLS_MAX_ACTIVE_PER_SESSION` (default 5). Exceeding → deterministic
   command error naming the cap and suggesting `/skills drop`.
-* Activating an unknown / skipped / disabled skill → deterministic error.
+- Activating an unknown / skipped / disabled skill → deterministic error.
   Activation is case-insensitive but stores the canonical name.
-* Session lifecycle inherits M6 semantics:
-  * `/new` → fresh session, empty active set.
-  * `/fork` → copied transcript **and** copied explicit active set
+- Session lifecycle inherits M6 semantics:
+  - `/new` → fresh session, empty active set.
+  - `/fork` → copied transcript **and** copied explicit active set
     (documented; fork is "continue from here", so pinned procedures carry
     over). Turn-scoped contextual state is never copied — it is recomputed.
-  * `/undo` → touches neither scope (undo is transcript/context surgery,
+  - `/undo` → touches neither scope (undo is transcript/context surgery,
     not procedure state).
-  * Unknown/deleted sessionId → activation commands fail deterministically.
+  - Unknown/deleted sessionId → activation commands fail deterministically.
 
 Explicit activation means:
 
@@ -603,9 +603,9 @@ selection (budgeted, deterministic)
 skill loaded for this turn/context only
 ```
 
-* Contextual skills are resolved **per turn** from the current user message
+- Contextual skills are resolved **per turn** from the current user message
   (plus, if cheap, the pending-session title — never the full transcript).
-* A contextually loaded skill does **not** enter the explicit active set.
+- A contextually loaded skill does **not** enter the explicit active set.
   Example:
 
 ```text
@@ -616,13 +616,13 @@ Current message:
     "Let's work on ICOS memory."
 
 Automatically loaded (this turn only):
-    icos-v3-stack
+    icos-stack
 
 Session explicit active set afterwards (unchanged):
     daily-journal
 ```
 
-* This prevents automatic discovery from gradually filling a session with
+- This prevents automatic discovery from gradually filling a session with
   accumulated skills: yesterday's relevance never leaks into today's
   context unless the user pinned it.
 
@@ -648,13 +648,13 @@ conversation → discoverSkills() → candidate → load for current turn (turn-
 /skills pull persona-anchor  → load for the next turn only (turn-explicit)
 ```
 
-* `/skills pull <name>` resolves `<name>` against the canonical registry
+- `/skills pull <name>` resolves `<name>` against the canonical registry
   (deterministic, case-insensitive; unknown / skipped / disabled / invalid
   names → deterministic runtime error, same pattern as `use`) and stages
   the skill for the **next** conversation turn in that session — without
   touching the explicit active set. An explicitly requested skill must
   never silently become session-pinned.
-* Staging is per-session pending state, consumed by the next
+- Staging is per-session pending state, consumed by the next
   `converse`/`converseStream` call and cleared whether or not the turn
   succeeds. A pulled skill therefore affects exactly one turn:
 
@@ -668,22 +668,22 @@ Following unrelated turn: persona-anchor gone
   (unless separately pinned via /skills use persona-anchor)
 ```
 
-* Requested skills bypass the auto-load count cap (the user explicitly
+- Requested skills bypass the auto-load count cap (the user explicitly
   asked) but still obey `SKILLS_MAX_CONTEXT_CHARS`: if the body cannot fit
   alongside explicit skills, `/skills pull` fails fast with a deterministic
   budget error naming the cap, rather than silently dropping. Placement
   order: explicit → requested → contextual fills the remainder.
-* The model cannot stage or pin skills by emitting text — no code path
+- The model cannot stage or pin skills by emitting text — no code path
   exists (same invariant as approvals). Only the command/runtime path
   (`SkillService.stageOneShot(sessionId, name)`) mutates pending state.
-* Do not build a full natural-language intent parser in M7. Recognizing
+- Do not build a full natural-language intent parser in M7. Recognizing
   free-text phrases like "pull your persona-anchor skill" stays a later
   model-assisted or deterministic interaction-layer concern. M7 builds the
   primitive (`loadBody(name)`) plus the command/runtime path
   (`/skills pull`). The architectural invariant is simply: **a named skill
   can be explicitly retrieved for the current turn without becoming
   persistent session state.**
-* Lifecycle: `/new` clears pending; `/fork` does not copy pending
+- Lifecycle: `/new` clears pending; `/fork` does not copy pending
   (turn-scoped by definition); `/undo` ignores it.
 
 ## 2. Conservative Automatic-Loading Policy
@@ -695,17 +695,17 @@ autonomous skill-selection system — deterministic relevance with a small N:
 0–N automatically loaded skills per turn (N = SKILLS_MAX_AUTO_LOADED_PER_TURN)
 ```
 
-* Selection: selector admits top-ranked matches while `maxChars`
+- Selection: selector admits top-ranked matches while `maxChars`
   (`SKILLS_MAX_CONTEXT_CHARS`) holds, skipping bodies that would overflow
   (continue to the next smaller candidate rather than failing the turn).
-* Explicitly active skills take budget priority, requested (turn-explicit)
+- Explicitly active skills take budget priority, requested (turn-explicit)
   skills second: contextual loading uses whatever body budget remains after
   both are placed. Requested skills bypass the selector entirely — the user
   named them — but still obey the char budget (enforced fail-fast at
   `/skills pull` time). Explicit skills themselves are never truncated or
   evicted by contextual ones — overflow there surfaces as today (provider
   error under normal 502/504 mapping), recorded in evidence if observed live.
-* No silent failure modes: when a discovered candidate is admitted or
+- No silent failure modes: when a discovered candidate is admitted or
   budget-rejected, the decision is recorded in the per-turn report (§M7c.4).
 
 ## 3. Context Construction (three skill tiers)
@@ -735,17 +735,17 @@ Current user input
 ```text
 <available_skills>
 - daily-journal: Capture the day's events as a structured journal entry.
-- icos-v3-stack: Architecture and conventions of the ICOS v3 stack.
+- icos-stack: Architecture and conventions of the ICOS v3 stack.
 To follow a procedure, the user may activate it with /skills use <name>.
 Relevant skills may also load automatically for the current turn.
 </available_skills>
 ```
 
-* Bounded by `SKILLS_MAX_CATALOG_ITEMS` (default 50, alphabetical). Overflow
+- Bounded by `SKILLS_MAX_CATALOG_ITEMS` (default 50, alphabetical). Overflow
   appends `(and N more — see /skills)`.
-* Empty catalog or `SKILLS_ENABLED=false` → block omitted entirely
+- Empty catalog or `SKILLS_ENABLED=false` → block omitted entirely
   (byte-identical context to pre-M7 — regression-test this).
-* Names + descriptions only, never bodies (the `core.md` "smallest useful
+- Names + descriptions only, never bodies (the `core.md` "smallest useful
   representation" rule).
 
 **Tier 2+3+4 — skill bodies (explicit, then requested, then contextual):**
@@ -757,20 +757,20 @@ the base system prompt and **before** history:
 messages[0] = { role: "system", content: systemPrompt + catalogBlock }
 messages[1] = { role: "system", content: <skill name="daily-journal" scope="explicit">\n<body>\n</skill> }
 messages[2] = { role: "system", content: <skill name="persona-anchor" scope="turn-explicit">\n<body>\n</skill> }
-messages[3] = { role: "system", content: <skill name="icos-v3-stack" scope="contextual">\n<body>\n</skill> }
+messages[3] = { role: "system", content: <skill name="icos-stack" scope="contextual">\n<body>\n</skill> }
 messages[4..] = history (bounded by maxHistory) + current input
 ```
 
-* Delimiters mandatory, now carrying `scope` so the model — and the
+- Delimiters mandatory, now carrying `scope` so the model — and the
   evidence log — can distinguish pinned procedures from turn-scoped ones.
   Skill bodies containing "ignore previous instructions" remain visibly
   quoted data.
-* Order deterministic: explicit skills alphabetical, then requested skills
+- Order deterministic: explicit skills alphabetical, then requested skills
   alphabetical (pending set is usually one), then contextual skills in
   selector rank order (alphabetical tiebreak) — identical across runs and
   providers.
-* Bodies injected verbatim (no templating, no variable interpolation in M7).
-* Skill content is never inserted as `user` or `assistant` roles.
+- Bodies injected verbatim (no templating, no variable interpolation in M7).
+- Skill content is never inserted as `user` or `assistant` roles.
 
 `buildContext()` signature evolves minimally:
 
@@ -800,9 +800,9 @@ last-turn report (memory only, cleared on restart alongside active sets):
 ```ts
 interface TurnSkillReport {
   sessionId: string;
-  explicit: string[];       // session-pinned names injected
-  contextual: string[];     // automatically discovered names injected
-  requested: string[];      // explicitly requested one-shot names injected
+  explicit: string[]; // session-pinned names injected
+  contextual: string[]; // automatically discovered names injected
+  requested: string[]; // explicitly requested one-shot names injected
   considered: SkillMatch[]; // discovery candidates admitted or budget-rejected
 }
 ```
@@ -836,7 +836,7 @@ M7c implements the `Skills:` line split by scope
 (`explicit 400 + requested 150 + contextual 242`) with per-skill breakdown on detail view,
 using the same estimator as the other lines. If `/context` is not otherwise
 built by M7 time, the split skills line ships as part of `/status` instead —
-one of the two must report skill token cost. Do not ship M7 without *some*
+one of the two must report skill token cost. Do not ship M7 without _some_
 deterministic token-visibility for injected skills.
 
 ## 6. Seed Skills (filesystem fixtures, not code)
@@ -846,7 +846,7 @@ Convert **five** entries into real `SKILL.md` files shipped as
 installation is an explicit operator copy step documented in evidence):
 
 ```text
-docs/skills/icos-v3-stack/SKILL.md  ← discovery-demo skill (project context)
+docs/skills/icos-stack/SKILL.md  ← discovery-demo skill (project context)
 docs/skills/persona-anchor/SKILL.md ← one-shot retrieval demo skill
 docs/skills/daily-journal/SKILL.md  ← Personal / daily-journal
 docs/skills/comments-pass/SKILL.md  ← Development / comments-pass
@@ -854,7 +854,7 @@ docs/skills/capture-idea/SKILL.md   ← Idea/Project Work / capture-idea
 ```
 
 Each seed body stays small (<2KB) and follows the M7a format. The
-`icos-v3-stack` seed exists specifically to demonstrate discovery: its
+`icos-stack` seed exists specifically to demonstrate discovery: its
 name/description must match inputs like "working on the ICOS v3
 stack" under the M7b scorer (assert this in tests). The `persona-anchor`
 seed supports the turn-explicit live demo (§Verification step 3). The seeds serve as:
@@ -869,26 +869,26 @@ Do not implement the full `skill-samples.md` wishlist (`bounty-hunter`,
 Render `/skills*` command results through the existing system-notice path
 (no new UI framework). If cheap, add explicit + last-turn contextual skill
 names to the session header line
-(`session abc123 · skills: daily-journal +req: persona-anchor +ctx: icos-v3-stack`).
+(`session abc123 · skills: daily-journal +req: persona-anchor +ctx: icos-stack`).
 No skill editor, no file browser, no settings page in M7.
 
 ## 8. What Skills Must Never Do (M7 invariants)
 
-* Never reach the LLM as `user` or `assistant` roles — `system` only.
-* Never persisted as transcript messages (`sessions`/`messages` tables
+- Never reach the LLM as `user` or `assistant` roles — `system` only.
+- Never persisted as transcript messages (`sessions`/`messages` tables
   untouched; FTS indexes unchanged).
-* Never fed to the M4 extractor as independent records — extraction input
+- Never fed to the M4 extractor as independent records — extraction input
   remains `{ userMessage, assistantMessage, bounded context }` as today;
   skill scaffolding and skill loads are not candidate provenance, and a
   skill load is not a memory event.
-* Never able to change runtime state (no activation, approval, session, or
+- Never able to change runtime state (no activation, approval, session, or
   config mutation via skill text; discovery is pure).
-* Never logged with secrets; never transmitted except as part of the normal
+- Never logged with secrets; never transmitted except as part of the normal
   provider request body the operator already configured.
-* Automatic discovery weakens none of these: content comes only from the
+- Automatic discovery weakens none of these: content comes only from the
   configured skill directory, validated before registration, symlinks
   contained, no code execution, no tool invocation, no memory writes.
-* Provider neutrality preserved: `ConversationService`, `SessionStore`,
+- Provider neutrality preserved: `ConversationService`, `SessionStore`,
   `MemoryCandidateExtractor`, and streaming contain **zero skill-format
   branches** — they see only `ChatMessage[]`. (Grep-verifiable, M5-style.)
 
@@ -950,69 +950,69 @@ intact.
 
 ## M7a tests
 
-* Loader: valid skill loads; missing frontmatter rejected; bad name
+- Loader: valid skill loads; missing frontmatter rejected; bad name
   rejected; name-mismatch rejected; missing description rejected; unknown
   frontmatter key rejected; empty body rejected; oversize body rejected;
   dotfile/symlink-escape skipped; duplicate names deterministic.
-* Descriptor/body split: `listDescriptors()` performs no body reads
+- Descriptor/body split: `listDescriptors()` performs no body reads
   (assert via fs spy); `loadBody()` reads canonical path, caches, fails
   cleanly on missing; refresh invalidates cache.
-* Registry: alphabetical descriptors; case-insensitive lookup; `scan()`
+- Registry: alphabetical descriptors; case-insensitive lookup; `scan()`
   idempotent; empty dir valid.
-* Config: defaults resolve (`~/.icos/skills/` etc.); `SKILLS_ENABLED=false`
+- Config: defaults resolve (`~/.icos/skills/` etc.); `SKILLS_ENABLED=false`
   disables loader + commands deterministically.
-* Commands: `/skills` empty catalog; `/skills show` happy path + unknown
+- Commands: `/skills` empty catalog; `/skills show` happy path + unknown
   404-path; `/skills refresh` counts; none trigger LLM calls (mock
   `LlmClient`, assert zero invocations — M6a-style).
-* Inspection endpoints: list/get shapes; unknown name 404.
+- Inspection endpoints: list/get shapes; unknown name 404.
 
 ## M7b tests (discovery)
 
-* Name matching; description matching; case-insensitivity.
-* Deterministic ranking: name-beats-description, alphabetical tiebreak,
+- Name matching; description matching; case-insensitivity.
+- Deterministic ranking: name-beats-description, alphabetical tiebreak,
   byte-identical output across runs on fixture catalog.
-* Ties; no-match → empty (never everything); blank input → empty.
-* Bounded result count (`limit` honored, default 5).
-* Malformed/skipped skills excluded from matches.
-* Disabled mode → always empty.
-* `suggest` returns the same ranking as `discoverSkills()` on the same
+- Ties; no-match → empty (never everything); blank input → empty.
+- Bounded result count (`limit` honored, default 5).
+- Malformed/skipped skills excluded from matches.
+- Disabled mode → always empty.
+- `suggest` returns the same ranking as `discoverSkills()` on the same
   input; never mutates active sets, never injects bodies.
-* `icos-v3-stack` seed matches "working on the ICOS v3 stack" (regression
+- `icos-stack` seed matches "working on the ICOS v3 stack" (regression
   anchor for the M7 demo).
 
 ## M7c tests (loading + injection)
 
-* Relevant skill injected for a matching turn; irrelevant skill not
+- Relevant skill injected for a matching turn; irrelevant skill not
   injected (bread-probe: message about an unrelated topic injects nothing
   previously relevant).
-* `SKILLS_MAX_AUTO_LOADED_PER_TURN` enforced; `SKILLS_MAX_CONTEXT_CHARS`
+- `SKILLS_MAX_AUTO_LOADED_PER_TURN` enforced; `SKILLS_MAX_CONTEXT_CHARS`
   enforced (overflow candidates skipped for smaller ones, turn succeeds).
-* Contextual skills do not enter the explicit active set (assert set
+- Contextual skills do not enter the explicit active set (assert set
   unchanged after auto-loaded turns).
-* Contextual skills do not persist into transcript, FTS, or extractor
+- Contextual skills do not persist into transcript, FTS, or extractor
   input (assert on repository contents + extractor mock args).
-* Multiple contextual skills ordered deterministically (selector rank,
+- Multiple contextual skills ordered deterministically (selector rank,
   alphabetical tiebreak); explicit → requested → contextual placement.
-* Explicit one-shot retrieval (`/skills pull`): stages the named skill for
+- Explicit one-shot retrieval (`/skills pull`): stages the named skill for
   exactly the next turn; injected once with `scope="turn-explicit"`, then
   gone; never enters the explicit set; unknown/skipped/disabled names and
   char-budget overflow fail fast with deterministic command errors; staged
   state cleared by `/new`, not copied by `/fork`, ignored by `/undo`;
   LLM-emitted text can neither stage nor pin (no code path exists).
-* Explicit activation: use/drop/active round-trip; unknown skill error;
+- Explicit activation: use/drop/active round-trip; unknown skill error;
   cap enforcement; case-insensitivity; `/new` clears explicit set;
   `/fork` copies explicit set only; `/undo` preserves both;
   LLM text cannot activate or discover-promote (no code path exists).
-* Service-level: `converse` and `converseStream` pass identical message
+- Service-level: `converse` and `converseStream` pass identical message
   arrays given the same turn input + explicit set (capture mock args,
   diff); history appended on clean completion only (M2 invariant intact).
-* `buildContext`: no-skills call byte-identical to pre-M7 output
+- `buildContext`: no-skills call byte-identical to pre-M7 output
   (regression); catalog capped with overflow notice; `scope` delimiters
   present; disabled mode strips everything.
-* Observability: last-turn report records explicit/contextual/considered;
+- Observability: last-turn report records explicit/contextual/considered;
   `/skills active` and inspection endpoint reflect it.
-* `/context` or `/status` skills-token split matches estimator output.
-* Seed fixtures parse clean under the M7a validator.
+- `/context` or `/status` skills-token split matches estimator output.
+- Seed fixtures parse clean under the M7a validator.
 
 ## Regression requirements (all green)
 
@@ -1028,10 +1028,10 @@ M6a/b/c              — commands bypass LLM; approvals/clarifications intact;
 
 Particular checks:
 
-* skills disabled → context byte-identical to pre-M7 (snapshot test).
-* commands (`/skills*` included) create no transcript rows, no candidates.
-* no secrets in skill paths/bodies reach logs or API error payloads.
-* `tsc` + `eslint` clean before evidence is accepted (AGENTS.md).
+- skills disabled → context byte-identical to pre-M7 (snapshot test).
+- commands (`/skills*` included) create no transcript rows, no candidates.
+- no secrets in skill paths/bodies reach logs or API error payloads.
+- `tsc` + `eslint` clean before evidence is accepted (AGENTS.md).
 
 ---
 
@@ -1041,27 +1041,27 @@ Particular checks:
 2. Seed a live catalog:
    ```bash
    mkdir -p ~/.icos/skills
-   cp -r docs/skills/icos-v3-stack ~/.icos/skills/
+   cp -r docs/skills/icos-stack ~/.icos/skills/
    cp -r docs/skills/daily-journal ~/.icos/skills/
    cp -r docs/skills/persona-anchor ~/.icos/skills/
    ```
 3. Boot Core, `POST /core/conversation/stream` via test client:
-   * `/skills` lists both; `/skills show icos-v3-stack` renders body.
-   * Discovery demo (the M7 behavioral proof):
+   - `/skills` lists both; `/skills show icos-stack` renders body.
+   - Discovery demo (the M7 behavioral proof):
      ```text
      User: "Today we're working on the ICOS v3 stack."
-       → ICOS discovers icos-v3-stack, loads it, answers with stack context.
+       → ICOS discovers icos-stack, loads it, answers with stack context.
      User: "What's the current architecture?"
        → still relevant; skill loads again for this turn (recomputed, not pinned).
      User: "Now let's talk about bread."
-       → icos-v3-stack NOT injected (no lingering relevance).
+       → icos-stack NOT injected (no lingering relevance).
      ```
      Verify each turn's injection via `/skills active` (explicit vs
      contextual) and the outgoing-`messages[]` debug log.
-   * Explicit control: `/skills use daily-journal` → pinned across turns
+   - Explicit control: `/skills use daily-journal` → pinned across turns
      (including unrelated ones); `/skills drop daily-journal` → reverts.
      Auto-discovery never mutates the explicit set (assert before/after).
-   * One-shot retrieval (the turn-explicit proof, using `persona-anchor`):
+   - One-shot retrieval (the turn-explicit proof, using `persona-anchor`):
      ```text
      User (command): /skills pull persona-anchor
        → deterministic staged result, no LLM contact.
@@ -1071,7 +1071,7 @@ Particular checks:
      Following turn: unrelated message
        → persona-anchor absent; explicit set untouched throughout.
      ```
-   * `/skills suggest "working on ICOS v3"` returns `icos-v3-stack`
+   - `/skills suggest "working on ICOS v3"` returns `icos-stack`
      without activating or injecting anything.
 4. Provider swap (M5-style, lightweight): same discovery flow against
    Ollama and one cloud provider — replies differ by model, discovery +
@@ -1103,21 +1103,21 @@ seed skills.
 
 Do NOT implement:
 
-* tool calling, tool schemas, tool execution, MCP servers (M8)
-* autonomous loops, scheduling, proactive skill invocation (M9)
-* skill learning from conversation, procedural-memory promotion (M10–M12)
-* vector/semantic skill retrieval, embeddings, re-ranking (M11)
-* skill ranking from historical success; automatic skill creation
-* skill marketplace, remote install, versioning DAG, dependency resolution
-* executable skill hooks, scripts, or permission elevation
-* file watcher / hot-reload (explicit `/skills refresh` suffices)
-* multi-file skill bundles / progressive disclosure beyond SKILL.md
-* plugin lifecycle (install/connect/sync/events) — see integrations notes
-* persistent skill activation database (explicit sets stay memory-only)
-* complex model-based skill routing
-* subagents invoking skills independently (deferred with subagents)
-* RBAC / multi-user skill scoping (single-user runtime in M7)
-* model routing or provider failover based on skills
+- tool calling, tool schemas, tool execution, MCP servers (M8)
+- autonomous loops, scheduling, proactive skill invocation (M9)
+- skill learning from conversation, procedural-memory promotion (M10–M12)
+- vector/semantic skill retrieval, embeddings, re-ranking (M11)
+- skill ranking from historical success; automatic skill creation
+- skill marketplace, remote install, versioning DAG, dependency resolution
+- executable skill hooks, scripts, or permission elevation
+- file watcher / hot-reload (explicit `/skills refresh` suffices)
+- multi-file skill bundles / progressive disclosure beyond SKILL.md
+- plugin lifecycle (install/connect/sync/events) — see integrations notes
+- persistent skill activation database (explicit sets stay memory-only)
+- complex model-based skill routing
+- subagents invoking skills independently (deferred with subagents)
+- RBAC / multi-user skill scoping (single-user runtime in M7)
+- model routing or provider failover based on skills
 
 ---
 
@@ -1130,60 +1130,60 @@ At the end of M7, ICOS can:
 3. [ ] explicitly activate a skill for a session (`/skills use`);
 4. [ ] explicitly deactivate it (`/skills drop`);
 5. [ ] discover relevant skills from conversation input
-   (`discoverSkills()`, `/skills suggest`);
+       (`discoverSkills()`, `/skills suggest`);
 6. [ ] load relevant skills on demand (`loadBody()` per turn);
 7. [ ] inject them into context without involving memory
-   (system-delimited, turn-scoped);
+       (system-delimited, turn-scoped);
 8. [ ] distinguish explicit session skills, requested one-shot skills,
-   and contextual turn-scoped skills (scopes labeled in context,
-   reports, and APIs);
+       and contextual turn-scoped skills (scopes labeled in context,
+       reports, and APIs);
 9. [ ] expose what skills were active/loaded for observability
-   (`/skills active`, `/context` split, last-turn report);
+       (`/skills active`, `/context` split, last-turn report);
 10. [ ] enforce context and skill-count limits
-    (`SKILLS_MAX_ACTIVE_PER_SESSION`, `SKILLS_MAX_AUTO_LOADED_PER_TURN`,
-    `SKILLS_MAX_CONTEXT_CHARS`);
+        (`SKILLS_MAX_ACTIVE_PER_SESSION`, `SKILLS_MAX_AUTO_LOADED_PER_TURN`,
+        `SKILLS_MAX_CONTEXT_CHARS`);
 11. [ ] remain completely tool-free and non-autonomous
-    (M1–M6 regressions green, provider neutrality grep-clean).
+        (M1–M6 regressions green, provider neutrality grep-clean).
 12. [ ] retrieve a named skill for the current turn without pinning it
-    (`/skills pull`, `scope="turn-explicit"`, staged-once semantics).
+        (`/skills pull`, `scope="turn-explicit"`, staged-once semantics).
 
 ## Slice gates
 
 ### M7a
 
-* [ ] `SKILL.md` format fixed (frontmatter schema + body limits enforced).
-* [ ] Loader scans descriptors, defers bodies; skips reported with reasons.
-* [ ] Registry lists descriptors deterministically; empty catalog valid.
-* [ ] `SKILLS_*` config + `.env.sample` docs; disabled mode byte-identical.
-* [ ] `/skills`, `/skills show`, `/skills refresh` deterministic, LLM-free.
-* [ ] Read-only inspection endpoints mirror the candidates pattern.
-* [ ] M7a tests green.
+- [ ] `SKILL.md` format fixed (frontmatter schema + body limits enforced).
+- [ ] Loader scans descriptors, defers bodies; skips reported with reasons.
+- [ ] Registry lists descriptors deterministically; empty catalog valid.
+- [ ] `SKILLS_*` config + `.env.sample` docs; disabled mode byte-identical.
+- [ ] `/skills`, `/skills show`, `/skills refresh` deterministic, LLM-free.
+- [ ] Read-only inspection endpoints mirror the candidates pattern.
+- [ ] M7a tests green.
 
 ### M7b
 
-* [ ] `discoverSkills()` deterministic over name+description (no embeddings).
-* [ ] Discovery pure: no state mutation, no bodies, no LLM.
-* [ ] `SkillSelector` seam + default top-N budgeted selector.
-* [ ] `/skills suggest` exposes the same engine, activates nothing.
-* [ ] M7b tests green (ranking, bounds, exclusion, disabled, seed anchor).
+- [ ] `discoverSkills()` deterministic over name+description (no embeddings).
+- [ ] Discovery pure: no state mutation, no bodies, no LLM.
+- [ ] `SkillSelector` seam + default top-N budgeted selector.
+- [ ] `/skills suggest` exposes the same engine, activates nothing.
+- [ ] M7b tests green (ranking, bounds, exclusion, disabled, seed anchor).
 
 ### M7c
 
-* [ ] Turn-scoped contextual loading bounded by both caps.
-* [ ] One-shot retrieval (`/skills pull`): named resolution, next-turn-only
-  injection with `scope="turn-explicit"`, never pinned; deterministic
-  errors for unknown/skipped/disabled/over-budget names.
-* [ ] No NL intent parser: free-text skill requests are out of scope;
-  the `loadBody(name)` primitive + command path is the M7 contract.
-* [ ] Three-tier context order with `scope` delimiters (`explicit`,
-  `turn-explicit`, `contextual`); stream+non-stream identical.
-* [ ] Explicit scope lifecycle (`/new` clears, `/fork` copies explicit only).
-* [ ] Last-turn report + `/context` split + active-endpoint scopes
-  (explicit / requested / contextual).
-* [ ] Five seed skills ship as `docs/skills/*/SKILL.md` fixtures.
-* [ ] Live discovery demo recorded under
+- [ ] Turn-scoped contextual loading bounded by both caps.
+- [ ] One-shot retrieval (`/skills pull`): named resolution, next-turn-only
+      injection with `scope="turn-explicit"`, never pinned; deterministic
+      errors for unknown/skipped/disabled/over-budget names.
+- [ ] No NL intent parser: free-text skill requests are out of scope;
+      the `loadBody(name)` primitive + command path is the M7 contract.
+- [ ] Three-tier context order with `scope` delimiters (`explicit`,
+      `turn-explicit`, `contextual`); stream+non-stream identical.
+- [ ] Explicit scope lifecycle (`/new` clears, `/fork` copies explicit only).
+- [ ] Last-turn report + `/context` split + active-endpoint scopes
+      (explicit / requested / contextual).
+- [ ] Five seed skills ship as `docs/skills/*/SKILL.md` fixtures.
+- [ ] Live discovery demo recorded under
       `.reference/plans/evidence/milestone-7-evidence-skills.md`.
-* [ ] `tsc` + `eslint` clean.
+- [ ] `tsc` + `eslint` clean.
 
 ## Key behavioral demonstration
 
@@ -1192,7 +1192,7 @@ User:
 "Today we're working on the ICOS v3 stack."
 
 ICOS:
-[discovers icos-v3-stack]
+[discovers icos-stack]
 [loads skill]
 [includes it in context]
 
@@ -1206,7 +1206,7 @@ User:
 "Now let's talk about bread."
 
 ICOS:
-[does not continue injecting icos-v3-stack merely because it was
+[does not continue injecting icos-stack merely because it was
 previously relevant, unless the user explicitly activated it]
 ```
 
@@ -1277,7 +1277,7 @@ Agency  → M9 (autonomy)
 Memory  → M10+ (belief)
 ```
 
-Skills teach ICOS *how*. They never, by themselves, *do*.
+Skills teach ICOS _how_. They never, by themselves, _do_.
 
 ---
 

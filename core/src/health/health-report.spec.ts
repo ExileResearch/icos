@@ -120,6 +120,33 @@ describe('buildHealthReport', () => {
     expect(report.host.cpuPercent).toBe(8);
   });
 
+  it('surfaces the R1 turn-error counts when the ledger is wired', async () => {
+    const { store, candidates, host, config } = setup();
+    const errors = {
+      counts: jest.fn(() => ({
+        since: '2026-10-26T00:00:00.000Z',
+        total: 3,
+        byBucket: { provider_http: 2, tool_syntax_leak: 1 },
+        toolSyntaxLeaks: 1,
+        last: { bucket: 'provider_http', code: 'http', at: 't' },
+      })),
+    };
+
+    const report = await buildHealthReport({
+      sessions: store,
+      candidates,
+      config,
+      host,
+      errors,
+    });
+
+    expect(report.errors).toMatchObject({
+      total: 3,
+      toolSyntaxLeaks: 1,
+      byBucket: { provider_http: 2, tool_syntax_leak: 1 },
+    });
+  });
+
   it('degrades when a store ping fails', async () => {
     const { store, host, config } = setup();
     const failing = {

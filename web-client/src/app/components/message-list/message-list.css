@@ -122,3 +122,19 @@
     max-width: 90%;
   }
 }
+
+/* Attachment strip (GH22): sits with its bubble, never wider than it. */
+.message-attachments {
+  margin-top: -0.5rem;
+  max-width: 80%;
+}
+
+.message-attachments.user {
+  align-self: flex-end;
+}
+
+@media (max-width: 600px) {
+  .message-attachments {
+    max-width: 90%;
+  }
+}
